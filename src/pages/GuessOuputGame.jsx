@@ -1,6 +1,9 @@
+
+
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { updateGameStats } from "../utils/UpdateGameStats";
 
 const QUESTION_BANK = {
   python: {
@@ -352,9 +355,8 @@ const GuessOutputGame = () => {
   const [wrong,     setWrong]     = useState(0);
   const [showExp,   setShowExp]   = useState(false);
   const [animKey,   setAnimKey]   = useState(0);
-
-  const [timeLeft, setTimeLeft] = useState(lvl.timeLimit);
-  const [timedOut, setTimedOut] = useState(false);
+  const [timeLeft,  setTimeLeft]  = useState(lvl.timeLimit);
+  const [timedOut,  setTimedOut]  = useState(false);
   const timerRef = useRef(null);
 
   const clearTimer = () => {
@@ -367,6 +369,23 @@ const GuessOutputGame = () => {
     setTimedOut(false);
   }, [lvl.timeLimit]);
 
+  // ── Save stats when game ends ────────────────────────────────────────────
+  useEffect(() => {
+    if ((phase === "result" || phase === "gameover") && user) {
+      updateGameStats({
+        userId: user.uid,
+        gameId,
+        langId,
+        level,
+        score,
+        total: TOTAL_Q,
+        passed: score >= PASS_SCORE,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // ── Timer tick ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "quiz" || selected !== null || timedOut) return;
     clearTimer();
@@ -379,8 +398,8 @@ const GuessOutputGame = () => {
           setWrong(w => w + 1);
           setLives(l => {
             const next = l - 1;
-            if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
-            return next;
+            if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
+            return Math.max(next, 0);
           });
           return 0;
         }
@@ -400,6 +419,7 @@ const GuessOutputGame = () => {
     const bank = QUESTION_BANK[langId?.toLowerCase()]?.[level] ?? [];
     setQuestions(shuffle(bank).slice(0, TOTAL_Q));
     setCurrent(0); setSelected(null); setShowExp(false);
+    setTimedOut(false);
     setLives(lvl.lives); setScore(0); setWrong(0);
     setAnimKey(k => k + 1);
     resetTimer();
@@ -424,25 +444,28 @@ const GuessOutputGame = () => {
       setWrong(w => w + 1);
       setLives(l => {
         const next = l - 1;
-        if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
-        return next;
+        if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
+        return Math.max(next, 0);
       });
     }
   };
 
+  // FIX: setTimedOut(false) was missing — without it, once timer fires on any
+  // question, every next question immediately shows as timed-out and blocks input.
   const handleNext = () => {
     const next = current + 1;
     if (next >= TOTAL_Q) { setPhase("result"); return; }
     setCurrent(next);
     setSelected(null);
     setShowExp(false);
+    setTimedOut(false);   // ← critical fix
     setAnimKey(k => k + 1);
     resetTimer();
   };
 
   const restart = () => loadQuestions();
 
-  // ── Shared styles ──────────────────────────────────────────────────────────
+  // ── Shared end-screen styles ────────────────────────────────────────────
   const endPageWrap  = { minHeight: "100vh", background: "#F5F0EB", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" };
   const endCardStyle = { background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "20px", padding: "40px 28px", textAlign: "center", width: "100%", maxWidth: "420px" };
   const scoreCircle  = (c) => ({ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${c}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: "#FAFAF8" });
@@ -450,7 +473,7 @@ const GuessOutputGame = () => {
   const btnSecondary = { background: "#F5F0EB", color: "#4A4540", border: "1.5px solid #DDD7CE", borderRadius: "12px", padding: "13px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" };
   const btnGroup     = { display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" };
 
-  // ── LOADING ────────────────────────────────────────────────────────────────
+  // ── LOADING ────────────────────────────────────────────────────────────
   if (phase === "loading") return (
     <div style={{ minHeight: "100vh", background: "#F5F0EB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -459,7 +482,7 @@ const GuessOutputGame = () => {
     </div>
   );
 
-  // ── GAME OVER ──────────────────────────────────────────────────────────────
+  // ── GAME OVER ──────────────────────────────────────────────────────────
   if (phase === "gameover") return (
     <div style={endPageWrap}>
       <div style={endCardStyle}>
@@ -480,7 +503,7 @@ const GuessOutputGame = () => {
     </div>
   );
 
-  // ── RESULT ─────────────────────────────────────────────────────────────────
+  // ── RESULT ─────────────────────────────────────────────────────────────
   if (phase === "result") {
     const passed    = score >= PASS_SCORE;
     const rc        = passed ? lvl.color : "#DC2626";
@@ -517,46 +540,75 @@ const GuessOutputGame = () => {
     );
   }
 
-  // ── QUIZ ───────────────────────────────────────────────────────────────────
+  // ── QUIZ ───────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        @keyframes spin        { to { transform:rotate(360deg); } }
+        @keyframes spin        { to { transform: rotate(360deg); } }
         @keyframes slideQ      { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
         @keyframes fadeExp     { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes urgentPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.13)} }
         @keyframes timedOutShake {
-          0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)}
-          40%{transform:translateX(5px)}   60%{transform:translateX(-4px)}
-          80%{transform:translateX(4px)}
+          0%,100%{transform:translateX(0)}
+          20%{transform:translateX(-5px)} 40%{transform:translateX(5px)}
+          60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
         }
-        .q-enter        { animation: slideQ       0.32s cubic-bezier(.22,.68,0,1.2) both; }
-        .exp-enter      { animation: fadeExp      0.24s ease both; }
-        .timed-out-shake{ animation: timedOutShake 0.45s ease both; }
-        .opt-hover:hover:not(:disabled) { transform:translateX(4px); border-color:#C4BADF !important; }
-        .next-hover:hover  { opacity:0.88; }
-        .next-hover:active { transform:scale(0.97); }
-        .exit-hover:hover  { background:#EDE8E1 !important; }
-        @media(max-width:600px){
-          .q-text-resp   { font-size:13px !important; }
-          .opt-text-resp { font-size:12px !important; }
-          .content-resp  { padding:14px 12px 40px !important; }
-          .topbar-resp   { padding:8px 12px !important; gap:8px !important; }
+        .gg-root      { min-height:100vh; background:#F5F0EB; font-family:'Segoe UI','Inter',system-ui,sans-serif; display:flex; flex-direction:column; }
+        .gg-topbar    { background:#FFF; border-bottom:1px solid #E8E2DA; padding:10px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+        .gg-container { flex:1; width:100%; max-width:700px; margin:0 auto; padding:20px 16px 48px; box-sizing:border-box; }
+        .gg-score-grid{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; background:#FFF; border:1px solid #E8E2DA; border-radius:14px; overflow:hidden; margin-bottom:18px; }
+        .gg-score-cell{ display:flex; flex-direction:column; align-items:center; padding:10px 6px; gap:2px; }
+        .q-enter      { animation:slideQ  0.32s cubic-bezier(.22,.68,0,1.2) both; }
+        .exp-enter    { animation:fadeExp 0.24s ease both; }
+        .timed-out-shake { animation:timedOutShake 0.45s ease both; }
+
+        .gg-code-pre  { margin:0; font-family:'Fira Code','Cascadia Code','Consolas',monospace; font-size:14px; color:#E8E8D0; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+        .gg-opt-btn   { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:14px; cursor:pointer; width:100%; text-align:left; transition:transform 0.15s,border-color 0.15s,background 0.15s; font-family:inherit; }
+        .gg-opt-btn:hover:not(:disabled) { transform:translateX(4px); }
+        .gg-opt-btn:disabled { cursor:default; }
+        .gg-opt-code  { flex:1; font-size:14px; font-weight:500; font-family:'Courier New',monospace; line-height:1.45; }
+        .gg-next-btn  { transition:opacity 0.15s,transform 0.1s; }
+        .gg-next-btn:hover  { opacity:0.88; }
+        .gg-next-btn:active { transform:scale(0.97); }
+        .gg-exit-btn:hover  { background:#EDE8E1 !important; }
+        .gg-meta-row  { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:6px; }
+
+        @media (max-width:600px){
+          .gg-topbar    { padding:8px 12px; gap:8px; }
+          .gg-container { padding:12px 10px 40px; }
+          .gg-score-grid{ grid-template-columns:1fr 1fr; }
+          .gg-score-cell{ padding:8px 4px; }
+          .gg-score-num { font-size:16px !important; }
+          .gg-score-lbl { font-size:9px !important; }
+          .gg-code-pre  { font-size:12px !important; }
+          .gg-opt-code  { font-size:12px !important; }
+          .gg-opt-btn   { padding:11px 12px; gap:9px; }
+        }
+        @media (max-width:400px){
+          .gg-code-pre  { font-size:11px !important; }
+          .gg-opt-code  { font-size:11px !important; }
+          .gg-opt-btn   { padding:10px 10px; }
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", background: "#F5F0EB", fontFamily: "'Segoe UI','Inter',system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
+      <div className="gg-root">
 
         {/* TOP BAR */}
-        <div className="topbar-resp" style={{ background: "#FFF", borderBottom: "1px solid #E8E2DA", padding: "10px 20px", display: "flex", alignItems: "center", gap: "12px", position: "sticky", top: 0, zIndex: 10 }}>
-          <button className="exit-hover" onClick={() => navigate(`/games/${gameId}/level/${langId}`)}
-            style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid #E0D8CF", background: "#F5F0EB", cursor: "pointer", fontSize: "15px", color: "#6B6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div className="gg-topbar">
+          <button
+            className="gg-exit-btn"
+            onClick={() => { clearTimer(); navigate(`/games/${gameId}/level/${langId}`); }}
+            style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid #E0D8CF", background: "#F5F0EB", cursor: "pointer", fontSize: "15px", color: "#6B6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
             ✕
           </button>
+
           <div style={{ flex: 1, height: "8px", background: "#EDE8E1", borderRadius: "999px", overflow: "hidden" }}>
             <div style={{ height: "100%", background: lvl.color, borderRadius: "999px", width: `${progress}%`, transition: "width 0.45s ease" }} />
           </div>
+
           <TimerRing timeLeft={timeLeft} timeLimit={lvl.timeLimit} color={lvl.color} />
+
           <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
             {Array.from({ length: lvl.lives }).map((_, i) => (
               <span key={i} style={{ fontSize: "18px", opacity: i < lives ? 1 : 0.22, lineHeight: 1 }}>❤️</span>
@@ -565,10 +617,10 @@ const GuessOutputGame = () => {
         </div>
 
         {/* CONTENT */}
-        <div className="content-resp" style={{ flex: 1, width: "100%", maxWidth: "680px", margin: "0 auto", padding: "20px 16px 48px" }}>
+        <div className="gg-container">
 
           {/* Meta row */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div className="gg-meta-row">
             <span style={{ fontSize: "13px", fontWeight: "600", color: "#8B7FB8" }}>
               💻 Guess the Output • {lang} • {lvl.label}
             </span>
@@ -578,16 +630,16 @@ const GuessOutputGame = () => {
           </div>
 
           {/* Score band */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "14px", overflow: "hidden", marginBottom: "18px" }}>
+          <div className="gg-score-grid">
             {[
               { num: score,               lbl: "Correct", color: "#16A34A" },
               { num: wrong,               lbl: "Wrong",   color: "#DC2626" },
               { num: PASS_SCORE,          lbl: "To Pass", color: "#D97706" },
               { num: `${lvl.timeLimit}s`, lbl: "Per Q",   color: "#6366F1" },
             ].map((s, i, arr) => (
-              <div key={s.lbl} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 6px", gap: "2px", borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
-                <span style={{ fontSize: "18px", fontWeight: "700", lineHeight: 1, color: s.color }}>{s.num}</span>
-                <span style={{ fontSize: "10px", color: "#A09890", fontWeight: "600", letterSpacing: "0.6px", textTransform: "uppercase" }}>{s.lbl}</span>
+              <div key={s.lbl} className="gg-score-cell" style={{ borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
+                <span className="gg-score-num" style={{ fontSize: "18px", fontWeight: "700", lineHeight: 1, color: s.color }}>{s.num}</span>
+                <span className="gg-score-lbl" style={{ fontSize: "10px", color: "#A09890", fontWeight: "600", letterSpacing: "0.6px", textTransform: "uppercase" }}>{s.lbl}</span>
               </div>
             ))}
           </div>
@@ -597,23 +649,27 @@ const GuessOutputGame = () => {
 
             {/* Timed-out banner */}
             {timedOut && (
-              <div className="exp-enter timed-out-shake" style={{ background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: "12px", padding: "11px 16px", fontSize: "14px", color: "#92400E", marginBottom: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="exp-enter timed-out-shake" style={{ background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: "12px", padding: "11px 16px", fontSize: "14px", color: "#92400E", marginBottom: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "20px" }}>⏰</span>
-                Time's up! Correct answer:&nbsp;
-                <code style={{ background: "#FDE68A", padding: "2px 8px", borderRadius: "6px", fontWeight: "800", fontFamily: "'Courier New',monospace" }}>
-                  {q?.options?.[q?.answer]}
-                </code>
+                <span>Time's up! Correct answer:&nbsp;
+                  <code style={{ background: "#FDE68A", padding: "2px 8px", borderRadius: "6px", fontWeight: "800", fontFamily: "'Courier New',monospace" }}>
+                    {q?.options?.[q?.answer]}
+                  </code>
+                </span>
               </div>
             )}
 
             {/* Dark code block */}
             <div style={{ background: "#1C1814", borderRadius: "16px", padding: "20px", marginBottom: "14px", overflowX: "auto" }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: "#6B9FD4", marginBottom: "10px", textTransform: "uppercase" }}>
-                {lang} • What is the output?
+              <div style={{ display: "flex", gap: "6px", marginBottom: "12px", alignItems: "center" }}>
+                {["#FF5F57", "#FEBC2E", "#28C840"].map((c, i) => (
+                  <div key={i} style={{ width: "10px", height: "10px", borderRadius: "50%", background: c }} />
+                ))}
+                <span style={{ marginLeft: "auto", fontSize: "11px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                  {lang.toLowerCase()} • what is the output?
+                </span>
               </div>
-              <pre className="q-text-resp" style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: "14px", color: "#E8E8D0", lineHeight: 1.7, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {q?.code}
-              </pre>
+              <pre className="gg-code-pre">{q?.code}</pre>
             </div>
 
             {/* Options */}
@@ -629,12 +685,17 @@ const GuessOutputGame = () => {
                   else            { bg = "#FAFAF8"; border = "#EDE8E1"; txtClr = "#C0B8B0"; letClr = "#C0B8B0"; }
                 }
                 return (
-                  <button key={i} className="opt-hover" disabled={answered} onClick={() => handleAnswer(i)}
-                    style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: bg, border: `1.5px solid ${border}`, borderRadius: "14px", cursor: answered ? "default" : "pointer", width: "100%", textAlign: "left", transition: "transform 0.15s,border-color 0.15s,background 0.15s" }}>
+                  <button
+                    key={i}
+                    className="gg-opt-btn"
+                    disabled={answered}
+                    onClick={() => handleAnswer(i)}
+                    style={{ background: bg, border: `1.5px solid ${border}` }}
+                  >
                     <span style={{ width: "32px", height: "32px", borderRadius: "50%", border: `1.5px solid ${letBorder}`, background: letBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", color: letClr, flexShrink: 0 }}>
                       {LETTERS[i]}
                     </span>
-                    <code className="opt-text-resp" style={{ flex: 1, fontSize: "14px", fontWeight: "500", color: txtClr, fontFamily: "'Courier New',monospace", lineHeight: 1.45 }}>
+                    <code className="gg-opt-code" style={{ color: txtClr }}>
                       {opt}
                     </code>
                     {answered && isAns && <span style={{ fontSize: "18px", flexShrink: 0 }}>✅</span>}
@@ -657,8 +718,11 @@ const GuessOutputGame = () => {
             {/* Next button */}
             {answered && (
               <div className="exp-enter" style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button className="next-hover" onClick={handleNext}
-                  style={{ background: lvl.color, color: "#FFF", border: "none", borderRadius: "12px", padding: "12px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: `0 4px 14px ${lvl.color}44` }}>
+                <button
+                  className="gg-next-btn"
+                  onClick={handleNext}
+                  style={{ background: lvl.color, color: "#FFF", border: "none", borderRadius: "12px", padding: "12px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: `0 4px 14px ${lvl.color}44` }}
+                >
                   {current + 1 >= TOTAL_Q ? "See Result" : "Next"} →
                 </button>
               </div>

@@ -1,9 +1,14 @@
-import { useNavigate, useParams } from "react-router-dom";
+// import { useNavigate, useParams, useLocation } from "react-router-dom";
+// import { useAuth } from "../context/AuthContext";
+// import { useState, useEffect, useCallback, useRef } from "react";
+// import { updateGameStats } from "../utils/UpdateGameStats";
+import { useNavigate, useParams,useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect,useCallback,useRef } from "react";
+import { updateGameStats } from "../utils/UpdateGameStats";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QUESTION BANK  (10 per language per level)
+// QUESTION BANK
 // ─────────────────────────────────────────────────────────────────────────────
 const QUESTION_BANK = {
   python: {
@@ -25,7 +30,7 @@ const QUESTION_BANK = {
       { q: "Which keyword is used to handle exceptions?", options: ["catch", "except", "error", "handle"], answer: 1, explanation: "Python uses 'except' to catch exceptions in try-except blocks." },
       { q: "What does enumerate() do?", options: ["Returns a list", "Yields index-value pairs", "Sorts items", "Filters items"], answer: 1, explanation: "enumerate() returns index-value pairs from an iterable." },
       { q: "What is a lambda function?", options: ["A class method", "An anonymous function", "A recursive function", "A built-in function"], answer: 1, explanation: "Lambda functions are small anonymous functions defined with the lambda keyword." },
-      { q: "Which creates a set in Python?", options: ["[]", "{}", "set()", "Both B and C"], answer: 3, explanation: "set() creates an empty set; {} creates an empty dict. Use set() for empty sets." },
+      { q: "Which creates a set in Python?", options: ["[]", "{}", "set()", "Both B and C"], answer: 3, explanation: "set() creates an empty set; {} creates an empty dict." },
       { q: "What does 'pass' do in Python?", options: ["Exits the loop", "Does nothing (placeholder)", "Returns None", "Skips to next iteration"], answer: 1, explanation: "'pass' is a null statement used as a placeholder." },
       { q: "What is the output of 'hello'.upper()?", options: ["HELLO", "Hello", "hello", "hELLO"], answer: 0, explanation: "upper() converts all characters to uppercase." },
       { q: "What does **kwargs allow in a function?", options: ["Positional args", "Variable keyword args", "Default values", "No args"], answer: 1, explanation: "**kwargs lets you pass a variable number of keyword arguments." },
@@ -40,7 +45,7 @@ const QUESTION_BANK = {
       { q: "What is the output of print(type(lambda x: x))?", options: ["<class 'function'>", "<class 'lambda'>", "<class 'method'>", "Error"], answer: 0, explanation: "Lambda functions are of type 'function' in Python." },
       { q: "Which method is called when an object is deleted?", options: ["__del__", "__remove__", "__destroy__", "__end__"], answer: 0, explanation: "__del__ is the destructor method called when an object is garbage collected." },
       { q: "What does zip() do?", options: ["Compresses files", "Combines iterables element-wise", "Sorts lists", "Flattens lists"], answer: 1, explanation: "zip() combines multiple iterables element-by-element into tuples." },
-      { q: "What is MRO in Python?", options: ["Module Resolution Order", "Method Resolution Order", "Memory Resource Object", "Multiple Return Order"], answer: 1, explanation: "MRO (Method Resolution Order) determines the order in which methods are inherited." },
+      { q: "What is MRO in Python?", options: ["Module Resolution Order", "Method Resolution Order", "Memory Resource Object", "Multiple Return Order"], answer: 1, explanation: "MRO determines the order in which methods are inherited." },
       { q: "What does the 'global' keyword do?", options: ["Creates a new global var", "References a variable in global scope", "Deletes a variable", "Imports globally"], answer: 1, explanation: "'global' declares that a variable inside a function refers to the global scope." },
     ],
   },
@@ -115,7 +120,7 @@ const QUESTION_BANK = {
       { q: "What does constexpr mean?", options: ["Constant expression evaluated at compile time", "A const pointer", "A runtime constant", "A macro constant"], answer: 0, explanation: "constexpr means the value/function can be evaluated at compile time." },
       { q: "What is std::move()?", options: ["Moves file", "Casts to rvalue reference", "Copies an object", "Frees memory"], answer: 1, explanation: "std::move() casts an lvalue to rvalue reference to enable move semantics." },
       { q: "What is perfect forwarding?", options: ["Copying args", "Forwarding args preserving value category", "Returning references", "Template specialization"], answer: 1, explanation: "Perfect forwarding preserves lvalue/rvalue nature of arguments in templates." },
-      { q: "What is CRTP (Curiously Recurring Template Pattern)?", options: ["A loop pattern", "Derived class as template arg to base", "Circular dependency", "A sorting algorithm"], answer: 1, explanation: "CRTP is when a class inherits from a template instantiation of itself." },
+      { q: "What is CRTP?", options: ["A loop pattern", "Derived class as template arg to base", "Circular dependency", "A sorting algorithm"], answer: 1, explanation: "CRTP is when a class inherits from a template instantiation of itself." },
       { q: "What does 'noexcept' specifier do?", options: ["Prevents exceptions from propagating", "Catches all exceptions", "Throws exceptions", "Ignores exceptions"], answer: 0, explanation: "noexcept declares a function won't throw, enabling compiler optimizations." },
       { q: "What is std::shared_ptr's overhead vs raw pointer?", options: ["No overhead", "Reference count + control block", "Extra copy of object", "Extra vtable"], answer: 1, explanation: "shared_ptr has a control block with reference counts, adding heap overhead." },
     ],
@@ -185,7 +190,7 @@ const QUESTION_BANK = {
     ],
     hard: [
       { q: "What is a CTE (Common Table Expression)?", options: ["A stored procedure", "A temporary named result set using WITH clause", "A permanent view", "A trigger"], answer: 1, explanation: "CTEs define temporary result sets referenced within a query using WITH." },
-      { q: "What is window function in SQL?", options: ["A JOIN type", "Performs calculation across related rows without grouping", "A subquery type", "A cursor"], answer: 1, explanation: "Window functions compute values across a set of rows related to the current row." },
+      { q: "What is a window function in SQL?", options: ["A JOIN type", "Performs calculation across related rows without grouping", "A subquery type", "A cursor"], answer: 1, explanation: "Window functions compute values across a set of rows related to the current row." },
       { q: "What does RANK() differ from ROW_NUMBER()?", options: ["No difference", "RANK() gives same rank to ties; ROW_NUMBER() is always unique", "ROW_NUMBER handles ties", "RANK is faster"], answer: 1, explanation: "RANK() assigns same rank to ties and skips numbers; ROW_NUMBER() is always sequential." },
       { q: "What is database normalization?", options: ["Sorting data", "Organizing data to reduce redundancy", "Indexing all columns", "Encrypting data"], answer: 1, explanation: "Normalization organizes tables to reduce data redundancy and improve integrity." },
       { q: "What is a deadlock in SQL?", options: ["Slow query", "Two transactions blocking each other", "NULL reference", "Index corruption"], answer: 1, explanation: "A deadlock occurs when two transactions wait for each other to release locks." },
@@ -194,44 +199,6 @@ const QUESTION_BANK = {
       { q: "What is a stored procedure?", options: ["A saved query result", "Precompiled set of SQL statements stored in database", "A view", "A trigger"], answer: 1, explanation: "A stored procedure is a precompiled collection of SQL statements saved in the database." },
       { q: "What is the difference between DELETE and TRUNCATE?", options: ["No difference", "DELETE logs each row; TRUNCATE is faster and unlogged", "TRUNCATE can use WHERE", "DELETE is faster"], answer: 1, explanation: "DELETE logs each row deletion and can use WHERE; TRUNCATE is a bulk operation." },
       { q: "What is a materialized view?", options: ["A regular view", "A view with physically stored results", "A temporary table", "An index"], answer: 1, explanation: "A materialized view stores the query result physically and refreshes periodically." },
-    ],
-  },
-  webdev: {
-    easy: [
-      { q: "What does HTML stand for?", options: ["Hyper Text Markup Language", "High Text Machine Language", "Hyper Transfer Markup Language", "Home Text Markup Language"], answer: 0, explanation: "HTML stands for HyperText Markup Language." },
-      { q: "Which HTML tag creates a hyperlink?", options: ["<link>", "<href>", "<a>", "<url>"], answer: 2, explanation: "<a> (anchor) tag creates hyperlinks using the href attribute." },
-      { q: "Which CSS property changes text color?", options: ["font-color", "text-color", "color", "foreground"], answer: 2, explanation: "The 'color' property sets the text color in CSS." },
-      { q: "Which HTML tag is used for the largest heading?", options: ["<h6>", "<h1>", "<header>", "<title>"], answer: 1, explanation: "<h1> is the largest heading tag in HTML." },
-      { q: "What does CSS stand for?", options: ["Creative Style Sheets", "Cascading Style Sheets", "Computer Style Sheets", "Colorful Style Sheets"], answer: 1, explanation: "CSS stands for Cascading Style Sheets." },
-      { q: "Which JavaScript method selects an element by ID?", options: ["querySelector()", "getElementById()", "getElement()", "selectById()"], answer: 1, explanation: "document.getElementById() selects a DOM element by its ID." },
-      { q: "What does the <div> tag represent?", options: ["Division/container element", "Data value", "Document info", "Default view"], answer: 0, explanation: "<div> is a block-level container element used for grouping." },
-      { q: "Which CSS property controls the space inside an element?", options: ["margin", "spacing", "padding", "border"], answer: 2, explanation: "padding controls the space between content and the element's border." },
-      { q: "Which HTML attribute specifies an image source?", options: ["href", "link", "src", "url"], answer: 2, explanation: "The src attribute specifies the URL of the image in <img> tag." },
-      { q: "What is the correct JavaScript syntax to write to the console?", options: ["print('Hello')", "log('Hello')", "console.log('Hello')", "write('Hello')"], answer: 2, explanation: "console.log() outputs messages to the browser's developer console." },
-    ],
-    medium: [
-      { q: "What is the CSS Box Model?", options: ["3D layout system", "Content, padding, border, margin layers", "Grid system", "Flexbox model"], answer: 1, explanation: "The Box Model describes content + padding + border + margin structure of elements." },
-      { q: "What does 'position: absolute' do in CSS?", options: ["Sticks to viewport", "Positions relative to nearest positioned ancestor", "Stays in flow", "Centres element"], answer: 1, explanation: "absolute positioning places element relative to its nearest positioned ancestor." },
-      { q: "What is an event listener in JavaScript?", options: ["A CSS rule", "A function that responds to user events", "An HTML attribute", "A server request"], answer: 1, explanation: "Event listeners wait for specific events (clicks, keypresses) and execute callback functions." },
-      { q: "What does 'async/await' do in JavaScript?", options: ["Synchronous code", "Handles asynchronous operations cleanly", "Multi-threading", "Error handling"], answer: 1, explanation: "async/await simplifies working with Promises, making async code look synchronous." },
-      { q: "What is the DOM?", options: ["Data Object Method", "Document Object Model — tree of HTML elements", "Default Output Mode", "Dynamic Object Map"], answer: 1, explanation: "DOM is a programming interface representing HTML as a tree of objects." },
-      { q: "What does localStorage do?", options: ["Server-side storage", "Stores data in browser with no expiry", "Session-only storage", "Cookie storage"], answer: 1, explanation: "localStorage stores key-value pairs in the browser persistently (no expiry)." },
-      { q: "What is Flexbox?", options: ["A JavaScript library", "CSS layout model for flexible containers", "An HTML element", "A grid system"], answer: 1, explanation: "Flexbox is a CSS layout module for distributing space in a container." },
-      { q: "What is a media query?", options: ["An API request", "CSS rule applied based on screen size/device", "A JavaScript event", "A database query"], answer: 1, explanation: "Media queries apply CSS rules conditionally based on device characteristics." },
-      { q: "What does 'let' vs 'var' differ in JavaScript?", options: ["No difference", "let is block-scoped; var is function-scoped", "var is newer", "let allows redeclaration"], answer: 1, explanation: "let has block scope; var has function scope and is hoisted." },
-      { q: "What is the purpose of the 'alt' attribute in <img>?", options: ["Image title", "Alternative text for accessibility/broken image", "Image URL", "Image size"], answer: 1, explanation: "alt provides alternative text when the image cannot be displayed or for screen readers." },
-    ],
-    hard: [
-      { q: "What is the Critical Rendering Path?", options: ["Server routing", "Steps browser takes to render a page", "Network latency", "JavaScript execution"], answer: 1, explanation: "The Critical Rendering Path is the sequence of steps to convert HTML/CSS/JS into pixels." },
-      { q: "What is a Service Worker?", options: ["Backend server", "Script running in background for offline/caching", "CSS worker", "Web socket"], answer: 1, explanation: "Service Workers run in background, enabling offline capabilities and push notifications." },
-      { q: "What is CORS?", options: ["CSS Framework", "Cross-Origin Resource Sharing — controls cross-domain requests", "A caching policy", "A routing method"], answer: 1, explanation: "CORS is a browser security mechanism controlling cross-origin HTTP requests." },
-      { q: "What is the difference between repaint and reflow?", options: ["No difference", "Reflow recalculates layout; repaint redraws visuals only", "Repaint is slower", "Reflow only affects CSS"], answer: 1, explanation: "Reflow recalculates geometry/layout; repaint redraws visual changes without layout changes." },
-      { q: "What is Content Security Policy (CSP)?", options: ["A CSS rule", "HTTP header preventing XSS attacks", "Browser storage policy", "A routing policy"], answer: 1, explanation: "CSP is an HTTP header that restricts which resources a page can load, preventing XSS." },
-      { q: "What is the Virtual DOM in React?", options: ["A server DOM", "In-memory representation of real DOM for efficient updates", "A CSS feature", "A browser API"], answer: 1, explanation: "Virtual DOM is a lightweight JS representation of the real DOM for efficient diffing." },
-      { q: "What is code splitting?", options: ["Splitting CSS files", "Breaking JS bundle into smaller chunks loaded on demand", "Dividing components", "Server-side rendering"], answer: 1, explanation: "Code splitting breaks large bundles into smaller chunks for faster initial load." },
-      { q: "What is Web Accessibility (a11y)?", options: ["Mobile design", "Making web content usable by people with disabilities", "Performance optimization", "SEO practice"], answer: 1, explanation: "Web accessibility ensures websites are usable by people with various disabilities." },
-      { q: "What is the difference between SSR and CSR?", options: ["No difference", "SSR renders on server; CSR renders in browser", "CSR is faster always", "SSR uses React only"], answer: 1, explanation: "SSR sends complete HTML from server; CSR renders content in the browser via JS." },
-      { q: "What is tree shaking?", options: ["DOM manipulation", "Removing unused code from JS bundle", "CSS purging", "Lazy loading"], answer: 1, explanation: "Tree shaking eliminates dead/unused code during the build process." },
     ],
   },
   dsa: {
@@ -272,14 +239,62 @@ const QUESTION_BANK = {
       { q: "What is a Fenwick Tree (Binary Indexed Tree)?", options: ["A BST variant", "Data structure for prefix sum queries and updates in O(log n)", "A heap", "A trie"], answer: 1, explanation: "Fenwick Tree supports prefix sum queries and point updates both in O(log n) with low overhead." },
     ],
   },
+  web: {
+    easy: [
+      { q: "What does HTML stand for?", options: ["Hyper Text Markup Language", "High Text Machine Language", "Hyper Transfer Markup Language", "Home Text Markup Language"], answer: 0, explanation: "HTML stands for HyperText Markup Language." },
+      { q: "Which HTML tag creates a hyperlink?", options: ["<link>", "<href>", "<a>", "<url>"], answer: 2, explanation: "<a> (anchor) tag creates hyperlinks using the href attribute." },
+      { q: "Which CSS property changes text color?", options: ["font-color", "text-color", "color", "foreground"], answer: 2, explanation: "The 'color' property sets the text color in CSS." },
+      { q: "Which HTML tag is used for the largest heading?", options: ["<h6>", "<h1>", "<header>", "<title>"], answer: 1, explanation: "<h1> is the largest heading tag in HTML." },
+      { q: "What does CSS stand for?", options: ["Creative Style Sheets", "Cascading Style Sheets", "Computer Style Sheets", "Colorful Style Sheets"], answer: 1, explanation: "CSS stands for Cascading Style Sheets." },
+      { q: "Which JavaScript method selects an element by ID?", options: ["querySelector()", "getElementById()", "getElement()", "selectById()"], answer: 1, explanation: "document.getElementById() selects a DOM element by its ID." },
+      { q: "What does the <div> tag represent?", options: ["Division/container element", "Data value", "Document info", "Default view"], answer: 0, explanation: "<div> is a block-level container element used for grouping." },
+      { q: "Which CSS property controls the space inside an element?", options: ["margin", "spacing", "padding", "border"], answer: 2, explanation: "padding controls the space between content and the element's border." },
+      { q: "Which HTML attribute specifies an image source?", options: ["href", "link", "src", "url"], answer: 2, explanation: "The src attribute specifies the URL of the image in <img> tag." },
+      { q: "What is the correct JavaScript syntax to write to the console?", options: ["print('Hello')", "log('Hello')", "console.log('Hello')", "write('Hello')"], answer: 2, explanation: "console.log() outputs messages to the browser's developer console." },
+    ],
+    medium: [
+      { q: "What is the CSS Box Model?", options: ["3D layout system", "Content, padding, border, margin layers", "Grid system", "Flexbox model"], answer: 1, explanation: "The Box Model describes content + padding + border + margin structure of elements." },
+      { q: "What does 'position: absolute' do in CSS?", options: ["Sticks to viewport", "Positions relative to nearest positioned ancestor", "Stays in flow", "Centres element"], answer: 1, explanation: "absolute positioning places element relative to its nearest positioned ancestor." },
+      { q: "What is an event listener in JavaScript?", options: ["A CSS rule", "A function that responds to user events", "An HTML attribute", "A server request"], answer: 1, explanation: "Event listeners wait for specific events and execute callback functions." },
+      { q: "What does 'async/await' do in JavaScript?", options: ["Synchronous code", "Handles asynchronous operations cleanly", "Multi-threading", "Error handling"], answer: 1, explanation: "async/await simplifies working with Promises, making async code look synchronous." },
+      { q: "What is the DOM?", options: ["Data Object Method", "Document Object Model — tree of HTML elements", "Default Output Mode", "Dynamic Object Map"], answer: 1, explanation: "DOM is a programming interface representing HTML as a tree of objects." },
+      { q: "What does localStorage do?", options: ["Server-side storage", "Stores data in browser with no expiry", "Session-only storage", "Cookie storage"], answer: 1, explanation: "localStorage stores key-value pairs in the browser persistently." },
+      { q: "What is Flexbox?", options: ["A JavaScript library", "CSS layout model for flexible containers", "An HTML element", "A grid system"], answer: 1, explanation: "Flexbox is a CSS layout module for distributing space in a container." },
+      { q: "What is a media query?", options: ["An API request", "CSS rule applied based on screen size/device", "A JavaScript event", "A database query"], answer: 1, explanation: "Media queries apply CSS rules conditionally based on device characteristics." },
+      { q: "What does 'let' vs 'var' differ in JavaScript?", options: ["No difference", "let is block-scoped; var is function-scoped", "var is newer", "let allows redeclaration"], answer: 1, explanation: "let has block scope; var has function scope and is hoisted." },
+      { q: "What is the purpose of the 'alt' attribute in <img>?", options: ["Image title", "Alternative text for accessibility/broken image", "Image URL", "Image size"], answer: 1, explanation: "alt provides alternative text when the image cannot be displayed." },
+    ],
+    hard: [
+      { q: "What is the Critical Rendering Path?", options: ["Server routing", "Steps browser takes to render a page", "Network latency", "JavaScript execution"], answer: 1, explanation: "The Critical Rendering Path is the sequence of steps to convert HTML/CSS/JS into pixels." },
+      { q: "What is a Service Worker?", options: ["Backend server", "Script running in background for offline/caching", "CSS worker", "Web socket"], answer: 1, explanation: "Service Workers run in background, enabling offline capabilities and push notifications." },
+      { q: "What is CORS?", options: ["CSS Framework", "Cross-Origin Resource Sharing — controls cross-domain requests", "A caching policy", "A routing method"], answer: 1, explanation: "CORS is a browser security mechanism controlling cross-origin HTTP requests." },
+      { q: "What is the difference between repaint and reflow?", options: ["No difference", "Reflow recalculates layout; repaint redraws visuals only", "Repaint is slower", "Reflow only affects CSS"], answer: 1, explanation: "Reflow recalculates geometry/layout; repaint redraws visual changes without layout changes." },
+      { q: "What is Content Security Policy (CSP)?", options: ["A CSS rule", "HTTP header preventing XSS attacks", "Browser storage policy", "A routing policy"], answer: 1, explanation: "CSP is an HTTP header that restricts which resources a page can load, preventing XSS." },
+      { q: "What is the Virtual DOM in React?", options: ["A server DOM", "In-memory representation of real DOM for efficient updates", "A CSS feature", "A browser API"], answer: 1, explanation: "Virtual DOM is a lightweight JS representation of the real DOM for efficient diffing." },
+      { q: "What is code splitting?", options: ["Splitting CSS files", "Breaking JS bundle into smaller chunks loaded on demand", "Dividing components", "Server-side rendering"], answer: 1, explanation: "Code splitting breaks large bundles into smaller chunks for faster initial load." },
+      { q: "What is Web Accessibility (a11y)?", options: ["Mobile design", "Making web content usable by people with disabilities", "Performance optimization", "SEO practice"], answer: 1, explanation: "Web accessibility ensures websites are usable by people with various disabilities." },
+      { q: "What is the difference between SSR and CSR?", options: ["No difference", "SSR renders on server; CSR renders in browser", "CSR is faster always", "SSR uses React only"], answer: 1, explanation: "SSR sends complete HTML from server; CSR renders content in the browser via JS." },
+      { q: "What is tree shaking?", options: ["DOM manipulation", "Removing unused code from JS bundle", "CSS purging", "Lazy loading"], answer: 1, explanation: "Tree shaking eliminates dead/unused code during the build process." },
+    ],
+  },
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
 const languageLabels = {
   python: "Python", c: "C", cpp: "C++",
-  java: "Java", sql: "SQL", webdev: "Web Dev", dsa: "DSA",
+  java: "Java", sql: "SQL", web: "Web Dev",
+  webdev: "Web Dev", dsa: "DSA",
 };
 
-// ── Time limits per difficulty ──
+// ✅ FIX: normalize any langId alias to the correct QUESTION_BANK key
+function normalizeLangId(id) {
+  if (!id) return id;
+  const map = { webdev: "web" };
+  return map[id.toLowerCase()] ?? id.toLowerCase();
+}
+
 const levelConfig = {
   easy:   { label: "Easy",   color: "#7C3AED", lives: 3, timeLimit: 30 },
   medium: { label: "Medium", color: "#D97706", lives: 3, timeLimit: 20 },
@@ -309,7 +324,12 @@ Return ONLY valid JSON array, no markdown:
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
@@ -321,53 +341,28 @@ Return ONLY valid JSON array, no markdown:
   return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TIMER RING — SVG countdown circle + number
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Timer Ring ────────────────────────────────────────────────────────────────
 const TimerRing = ({ timeLeft, timeLimit, color }) => {
-  const R            = 16;
+  const R             = 16;
   const circumference = 2 * Math.PI * R;
-  const pct          = timeLeft / timeLimit;
-  const dashOffset   = circumference * (1 - pct);
-
-  // Colour shifts from level-colour → amber → red as time drains
-  const ringColor =
-    pct > 0.5  ? color
-    : pct > 0.25 ? "#D97706"
-    : "#DC2626";
-
-  const isUrgent = timeLeft <= 5 && timeLeft > 0;
+  const pct           = timeLeft / timeLimit;
+  const dashOffset    = circumference * (1 - pct);
+  const ringColor     = pct > 0.5 ? color : pct > 0.25 ? "#D97706" : "#DC2626";
+  const isUrgent      = timeLeft <= 5 && timeLeft > 0;
 
   return (
     <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
-      <svg
-        width="44" height="44" viewBox="0 0 44 44"
-        style={{
-          transform: "rotate(-90deg)",
-          animation: isUrgent ? "urgentPulse 0.55s ease-in-out infinite" : "none",
-        }}
-      >
-        {/* Track */}
+      <svg width="44" height="44" viewBox="0 0 44 44"
+        style={{ transform: "rotate(-90deg)", animation: isUrgent ? "urgentPulse 0.55s ease-in-out infinite" : "none" }}>
         <circle cx="22" cy="22" r={R} fill="none" stroke="#EDE8E1" strokeWidth="3.5" />
-        {/* Countdown arc */}
-        <circle
-          cx="22" cy="22" r={R}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          style={{ transition: "stroke-dashoffset 0.92s linear, stroke 0.3s ease" }}
-        />
+        <circle cx="22" cy="22" r={R} fill="none" stroke={ringColor} strokeWidth="3.5"
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset}
+          style={{ transition: "stroke-dashoffset 0.92s linear, stroke 0.3s ease" }} />
       </svg>
-      {/* Centred number */}
       <span style={{
-        position: "absolute", inset: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "13px", fontWeight: "800",
-        color: ringColor, lineHeight: 1,
-        transition: "color 0.3s ease",
+        position: "absolute", inset: 0, display: "flex", alignItems: "center",
+        justifyContent: "center", fontSize: "13px", fontWeight: "800",
+        color: ringColor, lineHeight: 1, transition: "color 0.3s ease",
       }}>
         {timeLeft}
       </span>
@@ -375,30 +370,78 @@ const TimerRing = ({ timeLeft, timeLimit, color }) => {
   );
 };
 
+// ── Pass & Play Turn Banner ───────────────────────────────────────────────────
+const TurnBanner = ({ currentTurn, playerNames, scores, colors }) => (
+  <div style={{
+    background: colors[currentTurn],
+    borderRadius: "12px",
+    padding: "10px 16px",
+    marginBottom: "14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <span style={{ fontSize: "20px" }}>{currentTurn === 0 ? "🟣" : "🔵"}</span>
+      <div>
+        <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
+          {playerNames[currentTurn]}'s Turn
+        </div>
+        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)" }}>
+          Pass &amp; Play Mode
+        </div>
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: "16px" }}>
+      {[0, 1].map(i => (
+        <div key={i} style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: currentTurn === i ? "#fff" : "rgba(255,255,255,0.5)" }}>
+            {scores[i]}
+          </div>
+          <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {playerNames[i]}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const QuizGame = () => {
   const navigate = useNavigate();
-  const { gameId, langId, level } = useParams();
+  const { gameId, langId: rawLangId, level } = useParams();
   const { user } = useAuth();
+
+  // ✅ FIX: normalize langId so "webdev" → "web", etc.
+  const langId = normalizeLangId(rawLangId);
+
+  // ── Pass & Play state ──────────────────────────────────────────────────────
+  const location = useLocation();
+  const { passAndPlay, player1, player2 } = location.state || {};
+  const playerNames   = [player1 || "Player 1", player2 || "Player 2"];
+  const playerColors  = ["#7C3AED", "#0891b2"];
+  const [pnpScores,   setPnpScores]   = useState([0, 0]);
+  const [currentTurn, setCurrentTurn] = useState(0);
+  const [showHandoff, setShowHandoff] = useState(false);
+  const [nextTurnIdx, setNextTurnIdx] = useState(1);
 
   const lang = languageLabels[langId] ?? langId;
   const lvl  = levelConfig[level] ?? levelConfig.easy;
 
-  const [phase,    setPhase]    = useState("loading");
-  const [questions,setQuestions]= useState([]);
-  const [current,  setCurrent]  = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [lives,    setLives]    = useState(lvl.lives);
-  const [score,    setScore]    = useState(0);
-  const [wrong,    setWrong]    = useState(0);
-  const [showExp,  setShowExp]  = useState(false);
-  const [animKey,  setAnimKey]  = useState(0);
-
-  // ── Timer ──────────────────────────────────────────────────────────────────
-  const [timeLeft, setTimeLeft] = useState(lvl.timeLimit);
-  const [timedOut, setTimedOut] = useState(false);
+  const [phase,     setPhase]     = useState("loading");
+  const [questions, setQuestions] = useState([]);
+  const [current,   setCurrent]   = useState(0);
+  const [selected,  setSelected]  = useState(null);
+  const [lives,     setLives]     = useState(lvl.lives);
+  const [score,     setScore]     = useState(0);
+  const [wrong,     setWrong]     = useState(0);
+  const [showExp,   setShowExp]   = useState(false);
+  const [animKey,   setAnimKey]   = useState(0);
+  const [timeLeft,  setTimeLeft]  = useState(lvl.timeLimit);
+  const [timedOut,  setTimedOut]  = useState(false);
   const timerRef = useRef(null);
 
   const clearTimer = () => {
@@ -411,16 +454,13 @@ const QuizGame = () => {
     setTimedOut(false);
   }, [lvl.timeLimit]);
 
-  // Tick every second while quiz is active and unanswered
   useEffect(() => {
-    if (phase !== "quiz" || selected !== null || timedOut) return;
-
+    if (phase !== "quiz" || selected !== null || timedOut || showHandoff) return;
     clearTimer();
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearTimer();
-          // Time's up: reveal correct answer, lose a life
           setTimedOut(true);
           setShowExp(true);
           setWrong(w => w + 1);
@@ -434,24 +474,16 @@ const QuizGame = () => {
         return prev - 1;
       });
     }, 1000);
-
     return clearTimer;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, selected, timedOut, current]);
+  }, [phase, selected, timedOut, current, showHandoff]);
 
-  // Stop timer immediately on answer
   useEffect(() => { if (selected !== null) clearTimer(); }, [selected]);
-
-  // Cleanup on unmount
   useEffect(() => () => clearTimer(), []);
 
-  // ── Load / restart ─────────────────────────────────────────────────────────
   const loadQuestions = useCallback(async () => {
     setPhase("loading");
     clearTimer();
-
-    const bankKey = langId?.toLowerCase();
-    const bank    = QUESTION_BANK[bankKey]?.[level];
+    const bank = QUESTION_BANK[langId]?.[level];
 
     if (bank && bank.length >= TOTAL_Q) {
       setQuestions(shuffle(bank).slice(0, TOTAL_Q));
@@ -466,6 +498,7 @@ const QuizGame = () => {
 
     setCurrent(0); setSelected(null); setShowExp(false);
     setLives(lvl.lives); setScore(0); setWrong(0);
+    setPnpScores([0, 0]); setCurrentTurn(0);
     setAnimKey(k => k + 1);
     resetTimer();
     setPhase("quiz");
@@ -486,6 +519,9 @@ const QuizGame = () => {
 
     if (idx === q.answer) {
       setScore(s => s + 1);
+      if (passAndPlay) {
+        setPnpScores(s => { const ns = [...s]; ns[currentTurn] += 1; return ns; });
+      }
     } else {
       setWrong(w => w + 1);
       setLives(l => {
@@ -499,6 +535,14 @@ const QuizGame = () => {
   const handleNext = () => {
     const next = current + 1;
     if (next >= TOTAL_Q) { setPhase("result"); return; }
+
+    if (passAndPlay) {
+      const nxt = 1 - currentTurn;
+      setNextTurnIdx(nxt);
+      setShowHandoff(true);
+      return;
+    }
+
     setCurrent(next);
     setSelected(null);
     setShowExp(false);
@@ -506,22 +550,64 @@ const QuizGame = () => {
     resetTimer();
   };
 
+  const continueAfterHandoff = () => {
+    setCurrentTurn(nextTurnIdx);
+    setCurrent(c => c + 1);
+    setSelected(null);
+    setShowExp(false);
+    setShowHandoff(false);
+    setAnimKey(k => k + 1);
+    resetTimer();
+  };
+
   const restart = () => loadQuestions();
 
-  // ── Shared style helpers ───────────────────────────────────────────────────
-  const endPageWrap  = { minHeight:"100vh", background:"#F5F0EB", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px" };
-  const endCardStyle = { background:"#FFF", border:"1px solid #E8E2DA", borderRadius:"20px", padding:"40px 28px", textAlign:"center", width:"100%", maxWidth:"420px" };
-  const scoreCircle  = (c) => ({ width:"96px", height:"96px", borderRadius:"50%", border:`4px solid ${c}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", background:"#FAFAF8" });
-  const btnPrimary   = (c) => ({ background:c, color:"#FFF", border:"none", borderRadius:"12px", padding:"13px 24px", fontSize:"15px", fontWeight:"700", cursor:"pointer", flex:"1 1 auto", minWidth:"120px" });
-  const btnSecondary = { background:"#F5F0EB", color:"#4A4540", border:"1.5px solid #DDD7CE", borderRadius:"12px", padding:"13px 20px", fontSize:"14px", fontWeight:"600", cursor:"pointer", flex:"1 1 auto", minWidth:"120px" };
-  const btnGroup     = { display:"flex", gap:"10px", flexWrap:"wrap", justifyContent:"center" };
+  // ── Style helpers ──────────────────────────────────────────────────────────
+  const endPageWrap  = { minHeight: "100vh", background: "#F5F0EB", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" };
+  const endCardStyle = { background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "20px", padding: "40px 28px", textAlign: "center", width: "100%", maxWidth: "420px" };
+  const scoreCircle  = (c) => ({ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${c}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: "#FAFAF8" });
+  const btnPrimary   = (c) => ({ background: c, color: "#FFF", border: "none", borderRadius: "12px", padding: "13px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" });
+  const btnSecondary = { background: "#F5F0EB", color: "#4A4540", border: "1.5px solid #DDD7CE", borderRadius: "12px", padding: "13px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" };
+  const btnGroup     = { display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" };
 
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (phase === "loading") return (
-    <div style={{ minHeight:"100vh", background:"#F5F0EB", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F5F0EB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ width:"44px", height:"44px", borderRadius:"50%", border:"4px solid #EDE8E1", borderTopColor:lvl.color, animation:"spin 0.85s linear infinite", marginBottom:"16px" }} />
-      <p style={{ color:lvl.color, fontWeight:"700", fontSize:"15px" }}>Loading {lvl.label} questions…</p>
+      <div style={{ width: "44px", height: "44px", borderRadius: "50%", border: "4px solid #EDE8E1", borderTopColor: lvl.color, animation: "spin 0.85s linear infinite", marginBottom: "16px" }} />
+      <p style={{ color: lvl.color, fontWeight: "700", fontSize: "15px" }}>Loading {lvl.label} questions…</p>
+    </div>
+  );
+
+  // ── HANDOFF SCREEN (Pass & Play) ───────────────────────────────────────────
+  if (showHandoff) return (
+    <div style={{ minHeight: "100vh", background: playerColors[nextTurnIdx] === "#7C3AED" ? "#2D1B69" : "#0C3D52", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ textAlign: "center", color: "#FFF" }}>
+        <span style={{ fontSize: "56px", display: "block", marginBottom: "16px" }}>
+          {nextTurnIdx === 0 ? "🟣" : "🔵"}
+        </span>
+        <h2 style={{ fontSize: "28px", fontWeight: "800", margin: "0 0 8px" }}>
+          {playerNames[nextTurnIdx]}'s Turn
+        </h2>
+        <p style={{ fontSize: "15px", opacity: 0.75, margin: "0 0 12px" }}>
+          Question {current + 2} of {TOTAL_Q}
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "32px", marginBottom: "32px" }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "28px", fontWeight: "800" }}>{pnpScores[i]}</div>
+              <div style={{ fontSize: "13px", opacity: 0.7 }}>{playerNames[i]}</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: "14px", opacity: 0.65, margin: "0 0 28px", maxWidth: "280px" }}>
+          Hand the device to <strong>{playerNames[nextTurnIdx]}</strong> and tap Ready!
+        </p>
+        <button onClick={continueAfterHandoff}
+          style={{ background: "#FFF", color: playerColors[nextTurnIdx], border: "none", borderRadius: "14px", padding: "14px 36px", fontSize: "16px", fontWeight: "800", cursor: "pointer" }}>
+          I'm Ready! →
+        </button>
+      </div>
     </div>
   );
 
@@ -529,18 +615,18 @@ const QuizGame = () => {
   if (phase === "gameover") return (
     <div style={endPageWrap}>
       <div style={endCardStyle}>
-        <span style={{ fontSize:"52px", marginBottom:"16px", display:"block" }}>💔</span>
-        <h2 style={{ fontSize:"24px", fontWeight:"800", color:"#DC2626", marginBottom:"8px" }}>Out of Lives!</h2>
+        <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>💔</span>
+        <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#DC2626", marginBottom: "8px" }}>Out of Lives!</h2>
         <div style={scoreCircle("#DC2626")}>
-          <span style={{ fontSize:"32px", fontWeight:"800", color:"#DC2626", lineHeight:1 }}>{score}</span>
-          <span style={{ fontSize:"12px", color:"#A09890", fontWeight:"600" }}>/ {TOTAL_Q}</span>
+          <span style={{ fontSize: "32px", fontWeight: "800", color: "#DC2626", lineHeight: 1 }}>{score}</span>
+          <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
         </div>
-        <p style={{ fontSize:"14px", color:"#7A7268", lineHeight:1.6, marginBottom:"20px" }}>
-          You scored <strong>{score}/{TOTAL_Q}</strong>. You need at least {PASS_SCORE} correct answers to pass.
+        <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "20px" }}>
+          You need at least {PASS_SCORE} correct answers to pass.
         </p>
         <div style={btnGroup}>
-          <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Restart Level</button>
-          <button style={btnSecondary} onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</button>
+          <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Restart</button>
+          <button style={btnSecondary} onClick={() => navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${rawLangId}`)}>← Back</button>
         </div>
       </div>
     </div>
@@ -548,29 +634,69 @@ const QuizGame = () => {
 
   // ── RESULT ─────────────────────────────────────────────────────────────────
   if (phase === "result") {
+    // ✅ Update Firestore stats on game completion (solo only)
+    if (user && !passAndPlay) {
+      updateGameStats(user.uid, score).catch(console.error);
+    }
+
+    // Pass & Play result
+    if (passAndPlay) {
+      const tied   = pnpScores[0] === pnpScores[1];
+      const winner = tied ? -1 : pnpScores[0] > pnpScores[1] ? 0 : 1;
+      return (
+        <div style={endPageWrap}>
+          <div style={endCardStyle}>
+            <span style={{ fontSize: "52px", display: "block", marginBottom: "16px" }}>{tied ? "🤝" : "🏆"}</span>
+            <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#1C1814", margin: "0 0 8px" }}>
+              {tied ? "It's a Tie!" : `${playerNames[winner]} Wins!`}
+            </h2>
+            <p style={{ fontSize: "14px", color: "#7A7268", marginBottom: "24px" }}>
+              {tied ? "Both players scored equally — great match!" : `${playerNames[winner]} answered more correctly!`}
+            </p>
+            <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
+              {[0, 1].map(i => (
+                <div key={i} style={{ flex: 1, background: winner === i ? "#F3F0FF" : "#FAFAF8", border: `2px solid ${winner === i ? playerColors[i] : "#E8E2DA"}`, borderRadius: "14px", padding: "16px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: playerColors[i], textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+                    {winner === i ? "🥇 " : ""}{playerNames[i]}
+                  </div>
+                  <div style={{ fontSize: "36px", fontWeight: "800", color: playerColors[i], lineHeight: 1 }}>{pnpScores[i]}</div>
+                  <div style={{ fontSize: "12px", color: "#9C9489", marginTop: "4px" }}>/ {TOTAL_Q}</div>
+                </div>
+              ))}
+            </div>
+            <div style={btnGroup}>
+              <button style={btnPrimary("#7C3AED")} onClick={restart}>↺ Play Again</button>
+              <button style={btnSecondary} onClick={() => navigate("/pass-and-play")}>← Change Game</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Solo result
     const passed    = score >= PASS_SCORE;
     const rc        = passed ? lvl.color : "#DC2626";
     const nextLevel = level === "easy" ? "medium" : level === "medium" ? "hard" : null;
     return (
       <div style={endPageWrap}>
         <div style={endCardStyle}>
-          <span style={{ fontSize:"52px", marginBottom:"16px", display:"block" }}>{passed ? "🏆" : "😔"}</span>
-          <h2 style={{ fontSize:"24px", fontWeight:"800", color:rc, marginBottom:"8px" }}>{passed ? "Level Complete!" : "Not Quite!"}</h2>
+          <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>{passed ? "🏆" : "😔"}</span>
+          <h2 style={{ fontSize: "24px", fontWeight: "800", color: rc, marginBottom: "8px" }}>{passed ? "Level Complete!" : "Not Quite!"}</h2>
           <div style={scoreCircle(rc)}>
-            <span style={{ fontSize:"32px", fontWeight:"800", color:rc, lineHeight:1 }}>{score}</span>
-            <span style={{ fontSize:"12px", color:"#A09890", fontWeight:"600" }}>/ {TOTAL_Q}</span>
+            <span style={{ fontSize: "32px", fontWeight: "800", color: rc, lineHeight: 1 }}>{score}</span>
+            <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
           </div>
-          <p style={{ fontSize:"14px", color:"#7A7268", lineHeight:1.6, marginBottom:"8px" }}>
-            {passed ? `Excellent work! You got ${score} out of ${TOTAL_Q} correct.` : `You need at least ${PASS_SCORE}/10 to pass. Keep practicing!`}
+          <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "8px" }}>
+            {passed ? `Excellent! You got ${score} out of ${TOTAL_Q} correct.` : `You need ${PASS_SCORE}/10 to pass. Keep practicing!`}
           </p>
-          <span style={{ fontSize:"13px", color:"#9C9489", marginBottom:"28px", display:"block" }}>
+          <span style={{ fontSize: "13px", color: "#9C9489", marginBottom: "28px", display: "block" }}>
             Lives remaining: {"❤️".repeat(lives)}{"🖤".repeat(Math.max(0, lvl.lives - lives))}
           </span>
           <div style={btnGroup}>
             {!passed && <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Try Again</button>}
-            {passed && nextLevel && <button style={btnPrimary(lvl.color)} onClick={() => navigate(`/games/${gameId}/play/${langId}/${nextLevel}`)}>Next Level →</button>}
+            {passed && nextLevel && <button style={btnPrimary(lvl.color)} onClick={() => navigate(`/games/${gameId}/play/${rawLangId}/${nextLevel}`)}>Next Level →</button>}
             {passed && !nextLevel && <button style={btnPrimary("#7C3AED")} onClick={() => navigate("/games")}>🎯 All Games</button>}
-            <button style={btnSecondary} onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</button>
+            <button style={btnSecondary} onClick={() => navigate(`/games/${gameId}/level/${rawLangId}`)}>← Change Level</button>
           </div>
         </div>
       </div>
@@ -587,165 +713,147 @@ const QuizGame = () => {
         @keyframes urgentPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.13)} }
         @keyframes timedOutShake {
           0%,100%{transform:translateX(0)}
-          20%{transform:translateX(-5px)}
-          40%{transform:translateX(5px)}
-          60%{transform:translateX(-4px)}
-          80%{transform:translateX(4px)}
+          20%{transform:translateX(-5px)} 40%{transform:translateX(5px)}
+          60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
         }
-
         .q-enter   { animation: slideQ  0.32s cubic-bezier(.22,.68,0,1.2) both; }
         .exp-enter { animation: fadeExp 0.24s ease both; }
         .timed-out-shake { animation: timedOutShake 0.45s ease both; }
-
         .opt-hover:hover:not(:disabled) { transform:translateX(4px); border-color:#C4BADF !important; }
         .next-hover:hover  { opacity:0.88; }
         .next-hover:active { transform:scale(0.97); }
         .exit-hover:hover  { background:#EDE8E1 !important; }
-
-        /* Responsive */
-        @media (max-width:600px){
-          .q-text-resp   { font-size:15px !important; }
-          .opt-text-resp { font-size:14px !important; }
-          .content-resp  { padding:14px 12px 40px !important; }
-          .topbar-resp   { padding:8px 12px !important; gap:8px !important; }
-          .end-card-resp { padding:28px 18px !important; }
-          .q-card-resp   { padding:16px 14px 14px !important; }
-          .btn-grp-resp  { flex-direction:column !important; }
-          .score-lbl-resp{ font-size:9px !important; }
-        }
-        @media (max-width:380px){
-          .q-text-resp   { font-size:14px !important; }
-          .letters-hide  { display:none !important; }
-          .score-lbl-resp{ display:none !important; }
+        @media(max-width:600px){
+          .q-text-resp{font-size:15px!important}
+          .opt-text-resp{font-size:14px!important}
+          .content-resp{padding:14px 12px 40px!important}
+          .topbar-resp{padding:8px 12px!important;gap:8px!important}
+          .q-card-resp{padding:16px 14px 14px!important}
+          .score-lbl-resp{font-size:9px!important}
         }
       `}</style>
 
-      <div style={{ minHeight:"100vh", background:"#F5F0EB", fontFamily:"'Segoe UI','Inter',system-ui,sans-serif", display:"flex", flexDirection:"column" }}>
+      <div style={{ minHeight: "100vh", background: "#F5F0EB", fontFamily: "'Segoe UI','Inter',system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
 
-        {/* ── TOP BAR ── */}
-        <div className="topbar-resp" style={{ background:"#FFF", borderBottom:"1px solid #E8E2DA", padding:"10px 20px", display:"flex", alignItems:"center", gap:"12px", position:"sticky", top:0, zIndex:10 }}>
-
-          <button className="exit-hover" onClick={() => navigate(`/games/${gameId}/level/${langId}`)}
-            style={{ width:"34px", height:"34px", borderRadius:"50%", border:"1.5px solid #E0D8CF", background:"#F5F0EB", cursor:"pointer", fontSize:"15px", color:"#6B6560", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        {/* TOP BAR */}
+        <div className="topbar-resp" style={{ background: "#FFF", borderBottom: "1px solid #E8E2DA", padding: "10px 20px", display: "flex", alignItems: "center", gap: "12px", position: "sticky", top: 0, zIndex: 10 }}>
+          <button className="exit-hover" onClick={() => navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${rawLangId}`)}
+            style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid #E0D8CF", background: "#F5F0EB", cursor: "pointer", fontSize: "15px", color: "#6B6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             ✕
           </button>
-
-          <div style={{ flex:1, height:"8px", background:"#EDE8E1", borderRadius:"999px", overflow:"hidden" }}>
-            <div style={{ height:"100%", background:lvl.color, borderRadius:"999px", width:`${progress}%`, transition:"width 0.45s ease" }} />
+          <div style={{ flex: 1, height: "8px", background: "#EDE8E1", borderRadius: "999px", overflow: "hidden" }}>
+            <div style={{ height: "100%", background: passAndPlay ? playerColors[currentTurn] : lvl.color, borderRadius: "999px", width: `${progress}%`, transition: "width 0.45s ease" }} />
           </div>
-
-          {/* ── TIMER RING ── */}
-          <TimerRing timeLeft={timeLeft} timeLimit={lvl.timeLimit} color={lvl.color} />
-
-          <div style={{ display:"flex", gap:"3px", flexShrink:0 }}>
-            {Array.from({ length:lvl.lives }).map((_,i) => (
-              <span key={i} style={{ fontSize:"18px", opacity: i < lives ? 1 : 0.22, lineHeight:1 }}>❤️</span>
+          <TimerRing timeLeft={timeLeft} timeLimit={lvl.timeLimit} color={passAndPlay ? playerColors[currentTurn] : lvl.color} />
+          <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+            {Array.from({ length: lvl.lives }).map((_, i) => (
+              <span key={i} style={{ fontSize: "18px", opacity: i < lives ? 1 : 0.22, lineHeight: 1 }}>❤️</span>
             ))}
           </div>
         </div>
 
-        {/* ── CONTENT ── */}
-        <div className="content-resp" style={{ flex:1, width:"100%", maxWidth:"680px", margin:"0 auto", padding:"20px 16px 48px" }}>
+        {/* CONTENT */}
+        <div className="content-resp" style={{ flex: 1, width: "100%", maxWidth: "680px", margin: "0 auto", padding: "20px 16px 48px" }}>
 
           {/* Meta row */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
-            <span style={{ fontSize:"13px", fontWeight:"600", color:"#8B7FB8" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#8B7FB8" }}>
               Quiz Master • {lang} • {lvl.label}
             </span>
-            <span style={{ fontSize:"13px", color:"#9C9489", fontWeight:"600", background:"#EDE8E1", padding:"4px 10px", borderRadius:"999px" }}>
+            <span style={{ fontSize: "13px", color: "#9C9489", fontWeight: "600", background: "#EDE8E1", padding: "4px 10px", borderRadius: "999px" }}>
               {current + 1}/{TOTAL_Q}
             </span>
           </div>
 
-          {/* Score band — 4 cells: Correct | Wrong | To Pass | Time */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", background:"#FFF", border:"1px solid #E8E2DA", borderRadius:"14px", overflow:"hidden", marginBottom:"18px" }}>
+          {/* Pass & Play turn banner */}
+          {passAndPlay && (
+            <TurnBanner
+              currentTurn={currentTurn}
+              playerNames={playerNames}
+              scores={pnpScores}
+              colors={playerColors}
+            />
+          )}
+
+          {/* Score band */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "14px", overflow: "hidden", marginBottom: "18px" }}>
             {[
-              { num: score,               lbl: "Correct",  color: "#16A34A" },
-              { num: wrong,               lbl: "Wrong",    color: "#DC2626" },
-              { num: PASS_SCORE,          lbl: "To Pass",  color: "#D97706" },
-              { num: `${lvl.timeLimit}s`, lbl: "Per Q",    color: "#6366F1" },
+              { num: passAndPlay ? pnpScores[0] : score, lbl: passAndPlay ? playerNames[0].split(" ")[0] : "Correct", color: "#16A34A" },
+              { num: passAndPlay ? pnpScores[1] : wrong,  lbl: passAndPlay ? playerNames[1].split(" ")[0] : "Wrong",   color: passAndPlay ? "#0891b2" : "#DC2626" },
+              { num: PASS_SCORE,          lbl: "To Pass", color: "#D97706" },
+              { num: `${lvl.timeLimit}s`, lbl: "Per Q",   color: "#6366F1" },
             ].map((s, i, arr) => (
-              <div key={s.lbl} style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 6px", gap:"2px", borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
-                <span className="score-num-resp" style={{ fontSize:"18px", fontWeight:"700", lineHeight:1, color:s.color }}>{s.num}</span>
-                <span className="score-lbl-resp" style={{ fontSize:"10px", color:"#A09890", fontWeight:"600", letterSpacing:"0.6px", textTransform:"uppercase" }}>{s.lbl}</span>
+              <div key={s.lbl} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 6px", gap: "2px", borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
+                <span style={{ fontSize: "18px", fontWeight: "700", lineHeight: 1, color: s.color }}>{s.num}</span>
+                <span className="score-lbl-resp" style={{ fontSize: "10px", color: "#A09890", fontWeight: "600", letterSpacing: "0.6px", textTransform: "uppercase" }}>{s.lbl}</span>
               </div>
             ))}
           </div>
 
           {/* Question area */}
           <div key={animKey} className="q-enter">
-
-            {/* Timed-out banner */}
             {timedOut && (
-              <div className="exp-enter timed-out-shake" style={{ background:"#FEF3C7", border:"1.5px solid #FCD34D", borderRadius:"12px", padding:"11px 16px", fontSize:"14px", color:"#92400E", marginBottom:"12px", fontWeight:"600", display:"flex", alignItems:"center", gap:"8px" }}>
-                <span style={{ fontSize:"20px" }}>⏰</span>
+              <div className="exp-enter timed-out-shake" style={{ background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: "12px", padding: "11px 16px", fontSize: "14px", color: "#92400E", marginBottom: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "20px" }}>⏰</span>
                 Time's up! Correct answer:&nbsp;
-                <span style={{ background:"#FDE68A", padding:"2px 8px", borderRadius:"6px", fontWeight:"800" }}>
+                <span style={{ background: "#FDE68A", padding: "2px 8px", borderRadius: "6px", fontWeight: "800" }}>
                   {q?.options?.[q?.answer]}
                 </span>
               </div>
             )}
 
-            {/* Question card */}
-            <div className="q-card-resp" style={{ background:"#FFF", border:"1px solid #E8E2DA", borderRadius:"16px", padding:"22px 20px 20px", marginBottom:"14px" }}>
-              <span style={{ fontSize:"11px", fontWeight:"700", letterSpacing:"1px", color:"#A09890", textTransform:"uppercase", marginBottom:"10px", display:"block" }}>
+            <div className="q-card-resp" style={{ background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "16px", padding: "22px 20px 20px", marginBottom: "14px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: "#A09890", textTransform: "uppercase", marginBottom: "10px", display: "block" }}>
                 Choose the correct answer:
               </span>
-              <p className="q-text-resp" style={{ fontSize:"18px", fontWeight:"700", color:"#1C1814", lineHeight:1.55, margin:0 }}>
+              <p className="q-text-resp" style={{ fontSize: "18px", fontWeight: "700", color: "#1C1814", lineHeight: 1.55, margin: 0 }}>
                 {q?.q}
               </p>
             </div>
 
-            {/* Options */}
-            <div style={{ display:"flex", flexDirection:"column", gap:"10px", marginBottom:"14px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "14px" }}>
               {q?.options.map((opt, i) => {
-                const isAns = i === q.answer;
-                const isSel = i === selected;
-                let bg="#FFF", border="#E8E2DA", txtClr="#1C1814";
-                let letBg="#F5F0EB", letClr="#6B6560", letBorder="#DDD7CE";
-
+                const isAns = i === q.answer, isSel = i === selected;
+                let bg = "#FFF", border = "#E8E2DA", txtClr = "#1C1814";
+                let letBg = "#F5F0EB", letClr = "#6B6560", letBorder = "#DDD7CE";
                 if (answered) {
-                  if (isAns)       { bg="#F0FDF4"; border="#86EFAC"; txtClr="#166534"; letBg="#DCFCE7"; letClr="#15803D"; letBorder="#86EFAC"; }
-                  else if (isSel)  { bg="#FEF2F2"; border="#FECACA"; txtClr="#991B1B"; letBg="#FEE2E2"; letClr="#B91C1C"; letBorder="#FECACA"; }
-                  else             { bg="#FAFAF8"; border="#EDE8E1"; txtClr="#C0B8B0"; letClr="#C0B8B0"; }
+                  if (isAns)      { bg = "#F0FDF4"; border = "#86EFAC"; txtClr = "#166534"; letBg = "#DCFCE7"; letClr = "#15803D"; letBorder = "#86EFAC"; }
+                  else if (isSel) { bg = "#FEF2F2"; border = "#FECACA"; txtClr = "#991B1B"; letBg = "#FEE2E2"; letClr = "#B91C1C"; letBorder = "#FECACA"; }
+                  else            { bg = "#FAFAF8"; border = "#EDE8E1"; txtClr = "#C0B8B0"; letClr = "#C0B8B0"; }
                 }
-
                 return (
                   <button key={i} className="opt-hover" disabled={answered} onClick={() => handleAnswer(i)}
-                    style={{ display:"flex", alignItems:"center", gap:"12px", padding:"14px 16px", background:bg, border:`1.5px solid ${border}`, borderRadius:"14px", cursor: answered ? "default" : "pointer", width:"100%", textAlign:"left", transition:"transform 0.15s,border-color 0.15s,background 0.15s" }}>
-                    <span className="letters-hide" style={{ width:"32px", height:"32px", borderRadius:"50%", border:`1.5px solid ${letBorder}`, background:letBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"13px", fontWeight:"700", color:letClr, flexShrink:0, transition:"all 0.15s" }}>
+                    style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: bg, border: `1.5px solid ${border}`, borderRadius: "14px", cursor: answered ? "default" : "pointer", width: "100%", textAlign: "left", transition: "transform 0.15s,border-color 0.15s,background 0.15s" }}>
+                    <span style={{ width: "32px", height: "32px", borderRadius: "50%", border: `1.5px solid ${letBorder}`, background: letBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", color: letClr, flexShrink: 0 }}>
                       {LETTERS[i]}
                     </span>
-                    <span className="opt-text-resp" style={{ flex:1, fontSize:"15px", fontWeight:"500", color:txtClr, lineHeight:1.45 }}>
+                    <span className="opt-text-resp" style={{ flex: 1, fontSize: "15px", fontWeight: "500", color: txtClr, lineHeight: 1.45 }}>
                       {opt}
                     </span>
-                    {answered && isAns && <span style={{ fontSize:"18px", flexShrink:0 }}>✅</span>}
-                    {answered && isSel && !isAns && <span style={{ fontSize:"18px", flexShrink:0 }}>❌</span>}
+                    {answered && isAns && <span style={{ fontSize: "18px", flexShrink: 0 }}>✅</span>}
+                    {answered && isSel && !isAns && <span style={{ fontSize: "18px", flexShrink: 0 }}>❌</span>}
                   </button>
                 );
               })}
             </div>
 
-            {/* Explanation — only for manual answers, not timeout */}
             {showExp && !timedOut && q?.explanation && (
-              <div className="exp-enter" style={{ background: isCorrect ? "#F0FDF4" : "#FEF2F2", border:`1.5px solid ${isCorrect ? "#86EFAC" : "#FECACA"}`, borderRadius:"12px", padding:"14px 16px", fontSize:"14px", color: isCorrect ? "#166534" : "#991B1B", lineHeight:1.6, marginBottom:"14px" }}>
-                <span style={{ fontWeight:"700", display:"block", marginBottom:"4px", color: isCorrect ? "#15803D" : "#B91C1C", fontSize:"13px" }}>
+              <div className="exp-enter" style={{ background: isCorrect ? "#F0FDF4" : "#FEF2F2", border: `1.5px solid ${isCorrect ? "#86EFAC" : "#FECACA"}`, borderRadius: "12px", padding: "14px 16px", fontSize: "14px", color: isCorrect ? "#166534" : "#991B1B", lineHeight: 1.6, marginBottom: "14px" }}>
+                <span style={{ fontWeight: "700", display: "block", marginBottom: "4px", fontSize: "13px" }}>
                   {isCorrect ? "✅ Correct!" : "❌ Incorrect!"}
                 </span>
                 {q.explanation}
               </div>
             )}
 
-            {/* Next button */}
             {answered && (
-              <div className="exp-enter" style={{ display:"flex", justifyContent:"flex-end" }}>
+              <div className="exp-enter" style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button className="next-hover" onClick={handleNext}
-                  style={{ background:lvl.color, color:"#FFF", border:"none", borderRadius:"12px", padding:"12px 24px", fontSize:"15px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px", boxShadow:`0 4px 14px ${lvl.color}44` }}>
-                  {current + 1 >= TOTAL_Q ? "See Result" : "Next"} →
+                  style={{ background: passAndPlay ? playerColors[currentTurn] : lvl.color, color: "#FFF", border: "none", borderRadius: "12px", padding: "12px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: `0 4px 14px rgba(0,0,0,0.2)` }}>
+                  {current + 1 >= TOTAL_Q ? "See Result" : passAndPlay ? `Pass to ${playerNames[1 - currentTurn]} →` : "Next →"}
                 </button>
               </div>
             )}
-
           </div>
         </div>
       </div>

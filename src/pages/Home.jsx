@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
@@ -387,11 +388,11 @@ const Home = () => {
 
           {/* ── NEW: Mode links in mobile menu too ── */}
           <div className="mobile-menu-item" style={{ color: dark ? "#c084fc" : "#7B2FBE" }}
-            onClick={() =>{ localStorage.setItem("gameMode", "pass-and-play");navigate("/games"); setMenuOpen(false); }}>
+            onClick={() =>{ localStorage.setItem("gameMode", "pass-and-play");navigate("/pass-and-play"); setMenuOpen(false); }}>
             🤝 Pass &amp; Play
           </div>
           <div className="mobile-menu-item" style={{ color: dark ? "#38bdf8" : "#0891b2" }}
-            onClick={() => {localStorage.setItem("gameMode", "vs-computer");navigate("/games"); setMenuOpen(false); }}>
+            onClick={() => {localStorage.setItem("gameMode", "vs-computer");navigate("/vs-computer"); setMenuOpen(false); }}>
             🤖 vs Computer
           </div>
 

@@ -1,11 +1,35 @@
+// import { useEffect, useState } from "react";
+// import { useAuth } from "../context/AuthContext";
+// import { signOut } from "firebase/auth";
+// import { auth, db } from "../firebase/FireBaseConfig";
+// import { doc, onSnapshot } from "firebase/firestore";
+// import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
-import { auth } from "../firebase/FireBaseConfig";
+import { auth, db } from "../firebase/FireBaseConfig";
+import { doc, onSnapshot} from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [stats, setStats] = useState({ games: 0, score: 0, streak: 0 });
+  const [loading, setLoading] = useState(true);
+
+  // Live Firestore listener — updates instantly when stats change
+  useEffect(() => {
+    if (!user) return;
+    const ref = doc(db, "users", user.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const { games = 0, score = 0, streak = 0 } = snap.data();
+        setStats({ games, score, streak });
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -34,10 +58,17 @@ const Profile = () => {
             <span style={styles.navBrand}>Code While Playing</span>
           </div>
           <div style={styles.navLinks}>
-            <span className="nav-link-btn" style={styles.navLink} onClick={() => navigate("/games")}>
+            <span
+              className="nav-link-btn"
+              style={styles.navLink}
+              onClick={() => navigate("/games")}
+            >
               Games
             </span>
-            <span className="nav-link-btn" style={{ ...styles.navLink, color: "#7B2FBE", fontWeight: "700" }}>
+            <span
+              className="nav-link-btn"
+              style={{ ...styles.navLink, color: "#7B2FBE", fontWeight: "700" }}
+            >
               Profile
             </span>
           </div>
@@ -63,37 +94,50 @@ const Profile = () => {
           <p style={styles.userEmail}>{user?.email || "Sign up to save your progress"}</p>
 
           {/* Stats Row */}
-          <div style={styles.statsRow}>
-            <div className="stat-card" style={styles.statCard}>
-              <span style={{ ...styles.statIcon, color: "#d97706" }}>🏆</span>
-              <span style={styles.statNum}>0</span>
-              <span style={styles.statLabel}>Games</span>
+          {loading ? (
+            <div style={styles.loadingText}>Loading stats...</div>
+          ) : (
+            <div style={styles.statsRow}>
+              <div className="stat-card" style={styles.statCard}>
+                <span style={{ ...styles.statIcon, color: "#d97706" }}>🏆</span>
+                <span style={styles.statNum}>{stats.games}</span>
+                <span style={styles.statLabel}>Games</span>
+              </div>
+              <div className="stat-card" style={styles.statCard}>
+                <span style={{ ...styles.statIcon, color: "#7B2FBE" }}>📖</span>
+                <span style={styles.statNum}>{stats.score}</span>
+                <span style={styles.statLabel}>Score</span>
+              </div>
+              <div className="stat-card" style={styles.statCard}>
+                <span style={{ ...styles.statIcon, color: "#e11d48" }}>🔥</span>
+                <span style={styles.statNum}>{stats.streak}</span>
+                <span style={styles.statLabel}>Streak</span>
+              </div>
             </div>
-            <div className="stat-card" style={styles.statCard}>
-              <span style={{ ...styles.statIcon, color: "#7B2FBE" }}>📖</span>
-              <span style={styles.statNum}>0</span>
-              <span style={styles.statLabel}>Score</span>
-            </div>
-            <div className="stat-card" style={styles.statCard}>
-              <span style={{ ...styles.statIcon, color: "#e11d48" }}>⚙️</span>
-              <span style={styles.statNum}>0</span>
-              <span style={styles.statLabel}>Streak</span>
-            </div>
-          </div>
+          )}
 
-          {/* Save Progress Card */}
-          <div style={styles.saveCard}>
-            <h2 style={styles.saveTitle}>Save Your Progress</h2>
-            <p style={styles.saveDesc}>
-              Sign up to track scores, unlock achievements, and compete with friends.
-            </p>
-            <button
-              style={styles.saveBtn}
-              onClick={() => navigate("/signup")}
-            >
-              Sign Out
-            </button>
-          </div>
+          {/* Save Progress Card — only show if not logged in */}
+          {!user ? (
+            <div style={styles.saveCard}>
+              <h2 style={styles.saveTitle}>Save Your Progress</h2>
+              <p style={styles.saveDesc}>
+                Sign up to track scores, unlock achievements, and compete with friends.
+              </p>
+              <button style={styles.saveBtn} onClick={() => navigate("/signup")}>
+                Sign Up
+              </button>
+            </div>
+          ) : (
+            <div style={styles.saveCard}>
+              <h2 style={styles.saveTitle}>Keep Playing!</h2>
+              <p style={styles.saveDesc}>
+                Complete more games to grow your score and keep your streak alive 🔥
+              </p>
+              <button style={styles.saveBtn} onClick={() => navigate("/games")}>
+                Play Games
+              </button>
+            </div>
+          )}
 
         </div>
       </div>
@@ -149,9 +193,7 @@ const styles = {
     padding: "60px 24px",
     animation: "fadeInUp 0.5s ease both",
   },
-  avatarWrap: {
-    marginBottom: "16px",
-  },
+  avatarWrap: { marginBottom: "16px" },
   avatar: {
     width: "90px",
     height: "90px",
@@ -173,6 +215,11 @@ const styles = {
     fontSize: "14px",
     color: "#888",
     margin: "0 0 36px",
+  },
+  loadingText: {
+    fontSize: "14px",
+    color: "#aaa",
+    marginBottom: "32px",
   },
   statsRow: {
     display: "flex",

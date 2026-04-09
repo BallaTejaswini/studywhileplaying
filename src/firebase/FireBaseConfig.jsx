@@ -1,5 +1,4 @@
 // import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 
 // const firebaseConfig = {
 //   apiKey: "AIzaSyDlkZe-OI7ozU-h9ggX485DXMVQ5wYxVs4",
@@ -14,13 +13,52 @@ import { getAuth } from "firebase/auth";
 
 
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+// import { initializeApp } from "firebase/app";
+// import { getAnalytics } from "firebase/analytics";
+// import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// const firebaseConfig = {
+//   apiKey: "AIzaSyCRsm4Xi-Tgsu_kHO7CuvxOyapj85Z0mSk",
+//   authDomain: "authexample-75dfb.firebaseapp.com",
+//   projectId: "authexample-75dfb",
+//   storageBucket: "authexample-75dfb.firebasestorage.app",
+//   messagingSenderId: "388368836614",
+//   appId: "1:388368836614:web:b31e9e414fc556703d7b87",
+//   measurementId: "G-1YBDJ5ZY53"
+// };
+
+// // Initialize Firebase
+// const app = initializeApp(firebaseConfig);
+// const analytics = getAnalytics(app);
+// export const auth = getAuth(app);
+// import { initializeApp } from "firebase/app";
+// import { getAuth } from "firebase/auth";
+// import { getFirestore } from "firebase/firestore";
+// import { getAnalytics } from "firebase/analytics";
+
+// const firebaseConfig = {
+//   apiKey: "AIzaSyCRsm4Xi-Tgsu_kHO7CuvxOyapj85Z0mSk",
+//   authDomain: "authexample-75dfb.firebaseapp.com",
+//   projectId: "authexample-75dfb",
+//   storageBucket: "authexample-75dfb.firebasestorage.app",
+//   messagingSenderId: "388368836614",
+//   appId: "1:388368836614:web:b31e9e414fc556703d7b87",
+//   measurementId: "G-1YBDJ5ZY53"
+// };
+
+// const app = initializeApp(firebaseConfig);
+// const analytics = getAnalytics(app);
+
+// export const auth = getAuth(app);
+// export const db = getFirestore(app);
+
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getAnalytics } from "firebase/analytics";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCRsm4Xi-Tgsu_kHO7CuvxOyapj85Z0mSk",
   authDomain: "authexample-75dfb.firebaseapp.com",
@@ -31,7 +69,8 @@ const firebaseConfig = {
   measurementId: "G-1YBDJ5ZY53"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
+
 export const auth = getAuth(app);
+export const db = getFirestore(app);

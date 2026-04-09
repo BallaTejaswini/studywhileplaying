@@ -1,7 +1,11 @@
-import { useNavigate, useParams } from "react-router-dom";
+
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { updateGameStats } from "../utils/UpdateGameStats";
 
+
+// ── COMPLETE QUESTION BANK FOR ALL LANGUAGES ──────────────────────────────────
 const QUESTION_BANK = {
   python: {
     easy: [
@@ -41,254 +45,274 @@ const QUESTION_BANK = {
       { code: `import threading\ncount = 0\ndef increment():\n    global count\n    count += 1\nthreads = [threading.Thread(target=increment) for _ in range(100)]\nfor t in threads: t.start()\nfor t in threads: t.join()\nprint(count)`, error: "Race condition", options: ["count += 1 is not atomic — threads may overwrite each other", "threading is wrong", "global is wrong", "join is wrong"], answer: 0, explanation: "count += 1 is read-modify-write, not atomic. Concurrent threads cause race conditions." },
     ],
   },
-  java: {
-    easy: [
-      { code: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello")\n    }\n}`, error: "Missing semicolon", options: ["Missing semicolon after println statement", "Main class is wrong", "args is wrong", "String is wrong"], answer: 0, explanation: "Java statements must end with a semicolon ';'." },
-      { code: `int x = "hello";`, error: "Type mismatch", options: ["Cannot assign String to int variable", "int is wrong", "hello needs no quotes", "x is wrong"], answer: 0, explanation: "int can only hold integer values, not String values." },
-      { code: `public class main {\n    public static void main(String[] args) {}\n}`, error: "Class name not capitalized", options: ["Class name 'main' should be 'Main' (capitalized)", "main method is wrong", "args is wrong", "public is wrong"], answer: 0, explanation: "Java class names should start with a capital letter by convention, and the file must match." },
-      { code: `int[] arr = new int[5];\nSystem.out.println(arr[5]);`, error: "ArrayIndexOutOfBoundsException", options: ["Index 5 is out of bounds for array of size 5", "arr is wrong", "int[] is wrong", "println is wrong"], answer: 0, explanation: "An array of size 5 has valid indices 0-4. Index 5 throws ArrayIndexOutOfBoundsException." },
-      { code: `String s = null;\nSystem.out.println(s.length());`, error: "NullPointerException", options: ["s is null, calling .length() throws NullPointerException", "length is wrong", "String is wrong", "println is wrong"], answer: 0, explanation: "Calling methods on a null reference throws NullPointerException." },
-      { code: `for (int i = 0; i <= 5; i++) {\n    System.out.println(arr[i]);\n}`, error: "Loop goes one index too far", options: ["i <= 5 causes index 5 which is out of bounds for size-5 array", "for syntax is wrong", "println is wrong", "arr is wrong"], answer: 0, explanation: "For an array of size 5, the loop should use i < 5, not i <= 5." },
-      { code: `int result = 5 / 2;\nSystem.out.println(result);`, error: "Integer division truncates decimal", options: ["5/2 in integer division gives 2, not 2.5", "result is wrong", "println is wrong", "int is wrong"], answer: 0, explanation: "Integer division truncates the decimal. Use double result = 5.0 / 2 to get 2.5." },
-      { code: `if (x = 5) {\n    System.out.println("five");\n}`, error: "Assignment instead of comparison", options: ["= is assignment, should use == for comparison", "if syntax is wrong", "println is wrong", "x is wrong"], answer: 0, explanation: "= assigns a value, == compares values. Java if condition needs ==." },
-      { code: `public static void main(String[] args) {\n    System.out.println(x);\n    int x = 10;\n}`, error: "Variable used before declaration", options: ["x is used before it is declared", "int is wrong", "println is wrong", "main is wrong"], answer: 0, explanation: "In Java, variables must be declared before use. Move int x = 10 before println." },
-      { code: `String a = "hello";\nString b = "hello";\nif (a == b) System.out.println("equal");`, error: "String comparison with ==", options: ["== compares references, not content — use .equals()", "String is wrong", "if syntax is wrong", "println is wrong"], answer: 0, explanation: "== checks reference equality for objects. Use a.equals(b) to compare String content." },
-    ],
-    medium: [
-      { code: `List<int> list = new ArrayList<>();`, error: "Cannot use primitive type in generics", options: ["Use Integer instead of int in generics", "List is wrong", "ArrayList is wrong", "new is wrong"], answer: 0, explanation: "Java generics require wrapper types. Use List<Integer> instead of List<int>." },
-      { code: `public class Animal {\n    void speak() {}\n}\npublic class Dog extends Animal {\n    @Override\n    void Speak() {}\n}`, error: "Method name doesn't match override", options: ["Speak() doesn't match speak() — @Override will fail", "extends is wrong", "void is wrong", "Animal is wrong"], answer: 0, explanation: "@Override requires exact method signature match including name. speak() ≠ Speak()." },
-      { code: `try {\n    int x = 1/0;\n} catch (Exception e) {\n    System.out.println(e);\n} finally {\n    return;\n}`, error: "return in finally suppresses exception", options: ["return in finally block suppresses any thrown exception", "try is wrong", "catch is wrong", "finally is wrong"], answer: 0, explanation: "A return in finally block overrides any exception or return in try/catch blocks." },
-      { code: `HashMap<String, Integer> map = new HashMap<>();\nmap.put("a", 1);\nint val = map.get("b");`, error: "NullPointerException from missing key", options: ["map.get('b') returns null, unboxing null to int throws NPE", "HashMap is wrong", "put is wrong", "int is wrong"], answer: 0, explanation: "map.get('b') returns null (key doesn't exist). Auto-unboxing null to int throws NullPointerException." },
-      { code: `for (String s : list) {\n    if (s.equals("remove"))\n        list.remove(s);\n}`, error: "ConcurrentModificationException", options: ["Removing from list while iterating throws ConcurrentModificationException", "for-each is wrong", "equals is wrong", "remove is wrong"], answer: 0, explanation: "You can't modify a collection while iterating it with for-each. Use Iterator.remove() instead." },
-      { code: `int[] arr = {1, 2, 3};\nint[] copy = arr;\ncopy[0] = 99;\nSystem.out.println(arr[0]);`, error: "Array reference copy not value copy", options: ["copy = arr copies reference — both point to same array", "arr is wrong", "copy is wrong", "println is wrong"], answer: 0, explanation: "Arrays are objects. copy = arr copies the reference. Modifying copy also modifies arr." },
-      { code: `String result = "";\nfor (int i = 0; i < 10000; i++)\n    result += i;`, error: "Inefficient string concatenation", options: ["String += in loop creates 10000 new String objects — use StringBuilder", "for is wrong", "result is wrong", "int is wrong"], answer: 0, explanation: "Strings are immutable. Each += creates a new String. Use StringBuilder.append() in loops." },
-      { code: `Integer a = 200;\nInteger b = 200;\nSystem.out.println(a == b);`, error: "Integer cache only covers -128 to 127", options: ["== on Integer objects outside cache range compares references not values", "Integer is wrong", "println is wrong", "200 is wrong"], answer: 0, explanation: "Java caches Integer objects from -128 to 127. For 200, == compares references, giving false." },
-      { code: `class Singleton {\n    private static Singleton instance;\n    public static Singleton getInstance() {\n        if (instance == null)\n            instance = new Singleton();\n        return instance;\n    }\n}`, error: "Not thread-safe singleton", options: ["getInstance is not synchronized — multiple threads may create multiple instances", "instance is wrong", "return is wrong", "class is wrong"], answer: 0, explanation: "Without synchronization, two threads can both see instance == null and create two instances." },
-      { code: `public void process(List<Object> list) {}\n// called with:\nList<String> strings = new ArrayList<>();\nprocess(strings);`, error: "Generics are invariant", options: ["List<String> is not a subtype of List<Object>", "List is wrong", "void is wrong", "ArrayList is wrong"], answer: 0, explanation: "Java generics are invariant. List<String> cannot be passed where List<Object> is expected." },
-    ],
-    hard: [
-      { code: `CompletableFuture.runAsync(() -> {\n    throw new RuntimeException("error");\n}).get();`, error: "Exception wrapped in ExecutionException", options: ["get() wraps exceptions in ExecutionException — must unwrap cause", "runAsync is wrong", "get is wrong", "throw is wrong"], answer: 0, explanation: "CompletableFuture.get() wraps exceptions in ExecutionException. Use getCause() to get original." },
-      { code: `List<String> list = Arrays.asList("a", "b", "c");\nlist.add("d");`, error: "Fixed-size list from Arrays.asList", options: ["Arrays.asList returns fixed-size list — add() throws UnsupportedOperationException", "Arrays is wrong", "add is wrong", "List is wrong"], answer: 0, explanation: "Arrays.asList returns a fixed-size list backed by the array. add/remove throw UnsupportedOperationException." },
-      { code: `void m(Object o) { System.out.println("Object"); }\nvoid m(String s) { System.out.println("String"); }\nObject x = "hello";\nm(x);`, error: "Method overloading resolved at compile time", options: ["m(x) calls Object version because overloading uses compile-time type", "Object is wrong", "String is wrong", "void is wrong"], answer: 0, explanation: "Overloading is resolved at compile time using the declared type. x is Object, so Object version is called." },
-      { code: `class MyException extends Exception {}\npublic void foo() throws MyException {\n    throw new MyException();\n}\npublic void bar() {\n    foo();\n}`, error: "Checked exception not handled", options: ["bar() calls foo() but doesn't catch or declare MyException", "throw is wrong", "extends is wrong", "void is wrong"], answer: 0, explanation: "MyException is a checked exception. bar() must either catch it or declare throws MyException." },
-      { code: `public class Token {\n    public final String value;\n    Token(String value) { this.value = value; }\n}\nToken t = new Token("x");\nt.value = "y";`, error: "Final field cannot be reassigned", options: ["final field value cannot be reassigned after construction", "Token is wrong", "String is wrong", "this is wrong"], answer: 0, explanation: "final fields can only be assigned once — in the constructor or at declaration. t.value = 'y' is a compile error." },
-      { code: `long result = 2000000000 * 2000000000;`, error: "Integer overflow before assignment to long", options: ["Literal arithmetic done in int — overflows before assignment to long", "long is wrong", "result is wrong", "= is wrong"], answer: 0, explanation: "The multiplication happens in int (overflow) before being assigned to long. Use 2000000000L * 2000000000L." },
-      { code: `@FunctionalInterface\ninterface Fn {\n    int apply(int x);\n    default int doubled(int x) { return apply(x) * 2; }\n    int negate(int x);\n}`, error: "Two abstract methods breaks @FunctionalInterface", options: ["Fn has two abstract methods (apply and negate) — not a valid functional interface", "@FunctionalInterface is wrong", "default is wrong", "int is wrong"], answer: 0, explanation: "@FunctionalInterface requires exactly one abstract method. apply() and negate() are both abstract." },
-      { code: `try (Connection conn = getConnection()) {\n    conn.setAutoCommit(false);\n    executeQuery(conn);\n    conn.commit();\n}`, error: "Missing rollback on exception", options: ["If executeQuery throws, conn is closed without rollback", "try is wrong", "commit is wrong", "setAutoCommit is wrong"], answer: 0, explanation: "Without a catch block to call conn.rollback(), any exception leaves the transaction uncommitted." },
-      { code: `class A {\n    static { System.out.println("A static"); }\n    { System.out.println("A instance"); }\n    A() { System.out.println("A constructor"); }\n}\nclass B extends A {\n    B() { System.out.println("B constructor"); }\n}`, error: "Wrong initialization order assumption", options: ["Order is: A static → A instance → A constructor → B constructor", "static is wrong", "extends is wrong", "B is wrong"], answer: 0, explanation: "Java init order: static blocks → instance blocks → constructor. Parent before child." },
-      { code: `public class Outer {\n    int x = 10;\n    class Inner {\n        int x = 20;\n        void print() { System.out.println(x); }\n    }\n}`, error: "Ambiguous field access", options: ["x inside Inner refers to Inner.x (20) not Outer.x — use Outer.this.x", "class is wrong", "print is wrong", "int is wrong"], answer: 0, explanation: "Inside Inner, x refers to Inner's x. To access Outer's x use Outer.this.x." },
-    ],
-  },
-  cpp: {
-    easy: [
-      { code: `#include <iostream>\nint main() {\n    cout << "Hello";\n}`, error: "Missing std:: or using namespace std", options: ["cout needs std:: prefix or 'using namespace std'", "include is wrong", "main is wrong", "return is missing"], answer: 0, explanation: "cout is in the std namespace. Use std::cout or add 'using namespace std;'." },
-      { code: `int arr[5];\narr[5] = 10;`, error: "Array out of bounds", options: ["Index 5 is out of bounds for array of size 5", "arr is wrong", "int is wrong", "= is wrong"], answer: 0, explanation: "An array of size 5 has valid indices 0-4. Index 5 is undefined behavior." },
-      { code: `int* ptr;\n*ptr = 42;`, error: "Uninitialized pointer dereference", options: ["ptr is uninitialized — dereferencing it is undefined behavior", "int* is wrong", "42 is wrong", "* is wrong"], answer: 0, explanation: "ptr points to a random memory location. Dereferencing it causes undefined behavior or crash." },
-      { code: `int x = 5;\nint y = 0;\nint z = x / y;`, error: "Division by zero", options: ["Dividing by zero is undefined behavior in C++", "int is wrong", "x is wrong", "z is wrong"], answer: 0, explanation: "Integer division by zero is undefined behavior in C++. Always check divisor before dividing." },
-      { code: `void swap(int a, int b) {\n    int tmp = a;\n    a = b;\n    b = tmp;\n}`, error: "Passed by value, original unchanged", options: ["a and b are copies — original variables are not swapped", "tmp is wrong", "void is wrong", "int is wrong"], answer: 0, explanation: "To swap originals, pass by reference: void swap(int& a, int& b)." },
-      { code: `int* getVal() {\n    int x = 42;\n    return &x;\n}`, error: "Returning address of local variable", options: ["x is destroyed when function returns — dangling pointer", "int* is wrong", "return is wrong", "42 is wrong"], answer: 0, explanation: "Local variables are destroyed on function exit. Returning &x gives a dangling pointer." },
-      { code: `int* p = new int(5);\ndelete p;\ncout << *p;`, error: "Use after delete (dangling pointer)", options: ["Accessing *p after delete is undefined behavior", "new is wrong", "delete is wrong", "cout is wrong"], answer: 0, explanation: "After delete, p is a dangling pointer. Dereferencing it is undefined behavior." },
-      { code: `for (int i = 0; i < 10; i--) {\n    cout << i;\n}`, error: "Infinite loop — decrementing instead of incrementing", options: ["i-- decrements i making loop infinite", "for is wrong", "cout is wrong", "int is wrong"], answer: 0, explanation: "i-- makes i go negative forever. Should be i++ to count up to 10." },
-      { code: `class Dog {\n    string name;\npublic:\n    void bark() { cout << name; }\n};`, error: "Missing #include for string", options: ["Need #include <string> to use string type", "class is wrong", "public is wrong", "void is wrong"], answer: 0, explanation: "The std::string type requires #include <string>." },
-      { code: `string s = "hello";\ncout << s[10];`, error: "String index out of bounds", options: ["Index 10 is beyond string length — undefined behavior", "string is wrong", "cout is wrong", "s is wrong"], answer: 0, explanation: "s has 5 characters (indices 0-4). Accessing index 10 is undefined behavior." },
-    ],
-    medium: [
-      { code: `int* arr = new int[10];\n// use arr\ndelete arr;`, error: "Wrong delete for array", options: ["Should use delete[] arr for array allocated with new[]", "new is wrong", "int* is wrong", "arr is wrong"], answer: 0, explanation: "Arrays allocated with new[] must be freed with delete[], not delete." },
-      { code: `class MyClass {\n    int* data;\npublic:\n    MyClass() { data = new int[100]; }\n};`, error: "Missing destructor — memory leak", options: ["No destructor to delete[] data — memory leak on destruction", "int* is wrong", "new is wrong", "class is wrong"], answer: 0, explanation: "Without ~MyClass() { delete[] data; }, the heap memory leaks when the object is destroyed." },
-      { code: `std::vector<int> v = {1,2,3};\nauto it = v.begin();\nv.push_back(4);\ncout << *it;`, error: "Iterator invalidated by push_back", options: ["push_back may reallocate vector — it is now invalid", "begin is wrong", "auto is wrong", "cout is wrong"], answer: 0, explanation: "push_back can trigger reallocation, invalidating all iterators. it is now a dangling iterator." },
-      { code: `class Base {\npublic:\n    ~Base() {}\n};\nclass Derived : public Base {\n    int* data;\npublic:\n    Derived() { data = new int[10]; }\n    ~Derived() { delete[] data; }\n};\nBase* b = new Derived();\ndelete b;`, error: "Non-virtual destructor — derived destructor not called", options: ["~Base() must be virtual or Derived destructor won't be called", "delete is wrong", "Base is wrong", "Derived is wrong"], answer: 0, explanation: "Without virtual ~Base(), delete b calls only ~Base(), leaking Derived's data." },
-      { code: `template<typename T>\nT add(T a, T b) { return a + b; }\nadd(1, 2.0);`, error: "Template type deduction conflict", options: ["1 is int and 2.0 is double — T can't be deduced", "template is wrong", "return is wrong", "typename is wrong"], answer: 0, explanation: "T must be one type. int and double conflict. Call add<double>(1, 2.0) to resolve." },
-      { code: `shared_ptr<int> p1 = make_shared<int>(42);\nshared_ptr<int> p2(p1.get());`, error: "Double free via raw pointer to shared_ptr", options: ["Two shared_ptrs from same raw pointer cause double delete", "make_shared is wrong", "int is wrong", "get is wrong"], answer: 0, explanation: "p2 wraps the raw pointer without sharing ownership with p1. Both will delete the same memory." },
-      { code: `struct Node {\n    shared_ptr<Node> next;\n    shared_ptr<Node> prev;\n};\nauto a = make_shared<Node>();\nauto b = make_shared<Node>();\na->next = b;\nb->prev = a;`, error: "Circular reference — memory leak", options: ["Circular shared_ptrs never reach zero refcount — memory leaks", "struct is wrong", "make_shared is wrong", "next is wrong"], answer: 0, explanation: "a and b reference each other, keeping refcount at 1. Use weak_ptr for back-references." },
-      { code: `void process(vector<int> v) {\n    // modify v\n}`, error: "Vector passed by value — expensive copy", options: ["Passing vector by value copies all elements — use const reference", "void is wrong", "vector is wrong", "int is wrong"], answer: 0, explanation: "Passing by value copies the entire vector. Use const vector<int>& v for read-only access." },
-      { code: `int x = 5;\nauto f = [&]() { return x * 2; };\nx = 10;\ncout << f();`, error: "Capture by reference — value changed after capture", options: ["[&] captures x by reference — f() returns 20 not 10", "auto is wrong", "return is wrong", "cout is wrong"], answer: 0, explanation: "Capture by reference means f() uses x's current value (10) when called, giving 20." },
-      { code: `constexpr int size = -1;\nint arr[size];`, error: "Negative array size", options: ["Array size must be positive — negative size is ill-formed", "constexpr is wrong", "int is wrong", "arr is wrong"], answer: 0, explanation: "Array sizes must be positive integers. size = -1 makes the declaration ill-formed." },
-    ],
-    hard: [
-      { code: `void foo(int& x) { x = 42; }\nfoo(5);`, error: "Cannot bind non-const reference to rvalue", options: ["5 is an rvalue — cannot bind to non-const lvalue reference", "void is wrong", "int& is wrong", "42 is wrong"], answer: 0, explanation: "Non-const lvalue references can't bind to rvalues like literals. Use int&& or const int&." },
-      { code: `char* str = "hello";\nstr[0] = 'H';`, error: "Modifying string literal — undefined behavior", options: ["String literals are read-only — modification is UB", "char* is wrong", "str is wrong", "= is wrong"], answer: 0, explanation: "String literals live in read-only memory. Assigning to char* (not const char*) and modifying is UB." },
-      { code: `int arr[3] = {1, 2, 3};\nint* p = arr + 5;\ncout << *p;`, error: "Pointer arithmetic out of bounds", options: ["arr+5 is past the end of array — dereferencing is UB", "int* is wrong", "arr is wrong", "cout is wrong"], answer: 0, explanation: "arr has 3 elements. arr+5 points far past the end. Dereferencing it is undefined behavior." },
-      { code: `std::string s = "hello";\nconst char* p = s.c_str();\ns += " world";\nstd::cout << p;`, error: "c_str() pointer invalidated by string modification", options: ["s += may reallocate — p is now a dangling pointer", "c_str is wrong", "const is wrong", "cout is wrong"], answer: 0, explanation: "Modifying the string may trigger reallocation, invalidating the pointer returned by c_str()." },
-      { code: `class Foo {\n    Foo(const Foo&) = delete;\n};\nFoo a;\nFoo b = a;`, error: "Copy constructor deleted", options: ["Copy constructor is deleted — Foo b = a is ill-formed", "class is wrong", "delete is wrong", "= is wrong"], answer: 0, explanation: "= delete on copy constructor prevents copying. Foo b = a won't compile." },
-      { code: `void f(int n) {\n    int arr[n];\n}`, error: "VLA not standard in C++", options: ["Variable-length arrays are not standard C++ — use vector instead", "void is wrong", "int is wrong", "arr is wrong"], answer: 0, explanation: "VLAs (variable-length arrays) are a C99 feature. They are not part of standard C++. Use std::vector<int> arr(n)." },
-      { code: `int x = 0;\nstd::thread t([&x]() { x++; });\nt.detach();\nstd::cout << x;`, error: "Race condition with detached thread", options: ["Detached thread may run after x is destroyed — data race", "thread is wrong", "detach is wrong", "cout is wrong"], answer: 0, explanation: "detach() lets thread run independently. If main exits first, x may be destroyed while thread uses it." },
-      { code: `template<typename T>\nauto multiply(T a, T b) -> decltype(a * b) {\n    return a + b;\n}`, error: "Return type says multiply but returns addition", options: ["decltype says a*b but function returns a+b — logic error", "template is wrong", "auto is wrong", "decltype is wrong"], answer: 0, explanation: "The trailing return type decltype(a*b) is fine but the body returns a+b — the function name and implementation don't match." },
-      { code: `struct S {\n    int x;\n    S(int x) : x(x) {}\n};\nS s = 5;`, error: "Implicit conversion may be unintended", options: ["S has implicit constructor allowing S s = 5 — should use explicit", "struct is wrong", "int is wrong", "= is wrong"], answer: 0, explanation: "Without explicit, S(int) allows implicit conversion. Use explicit S(int x) to prevent this." },
-      { code: `class A {\npublic:\n    virtual void f() { cout << \"A\"; }\n    void g() { f(); }\n};\nclass B : public A {\n    void f() override { cout << \"B\"; }\n};\nA a; a.g();`, error: "Wrong expectation about virtual dispatch", options: ["g() calls f() virtually — B::f is not called since object is A", "virtual is wrong", "override is wrong", "g is wrong"], answer: 0, explanation: "Since a is type A (not B), virtual dispatch calls A::f. B::f is only called if the object is B." },
-    ],
-  },
-  sql: {
-    easy: [
-      { code: `SELECT name age FROM users;`, error: "Missing comma between columns", options: ["Missing comma between name and age", "SELECT is wrong", "FROM is wrong", "users is wrong"], answer: 0, explanation: "Column names in SELECT must be separated by commas." },
-      { code: `SELECT * FROM users WHERE name = Alice;`, error: "String value not quoted", options: ["Alice must be in quotes: WHERE name = 'Alice'", "SELECT is wrong", "WHERE is wrong", "* is wrong"], answer: 0, explanation: "String values in SQL must be wrapped in single quotes." },
-      { code: `INSERT INTO users (name, age)\nVALUES ('Alice');`, error: "Column count mismatch", options: ["2 columns listed but only 1 value provided", "INSERT is wrong", "INTO is wrong", "VALUES is wrong"], answer: 0, explanation: "The number of values must match the number of columns listed." },
-      { code: `SELECT * FROM users\nWHERE age > 18\nORDER name;`, error: "Missing BY in ORDER BY", options: ["Should be ORDER BY name not ORDER name", "SELECT is wrong", "WHERE is wrong", "FROM is wrong"], answer: 0, explanation: "The correct syntax is ORDER BY, not just ORDER." },
-      { code: `UPDATE users\nWHERE name = 'Alice'\nSET age = 31;`, error: "SET must come before WHERE in UPDATE", options: ["SET clause must come before WHERE in UPDATE", "UPDATE is wrong", "WHERE is wrong", "age is wrong"], answer: 0, explanation: "Correct UPDATE syntax is: UPDATE table SET column=value WHERE condition." },
-      { code: `SELECT COUNT(name) FROM users\nGROUP name;`, error: "Missing BY in GROUP BY", options: ["Should be GROUP BY name not GROUP name", "COUNT is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "The correct syntax is GROUP BY, not just GROUP." },
-      { code: `DELETE users WHERE id = 1;`, error: "Missing FROM in DELETE", options: ["Should be DELETE FROM users not DELETE users", "DELETE is wrong", "WHERE is wrong", "id is wrong"], answer: 0, explanation: "The correct syntax is DELETE FROM table WHERE condition." },
-      { code: `SELECT * FROM users WHERE age BETWEEN 20 TO 30;`, error: "Wrong BETWEEN syntax", options: ["BETWEEN uses AND not TO: BETWEEN 20 AND 30", "SELECT is wrong", "WHERE is wrong", "age is wrong"], answer: 0, explanation: "BETWEEN syntax is: value BETWEEN low AND high." },
-      { code: `SELECT name, COUNT(*)\nFROM users;`, error: "Missing GROUP BY for aggregate", options: ["COUNT(*) with non-aggregate column requires GROUP BY", "SELECT is wrong", "COUNT is wrong", "FROM is wrong"], answer: 0, explanation: "When mixing aggregate functions with non-aggregate columns, GROUP BY is required." },
-      { code: `SELECT * FROM users\nWHERE name LIKE '%alice';`, error: "Case-sensitive LIKE may miss results", options: ["LIKE is case-sensitive in many DBs — 'Alice' won't match '%alice'", "LIKE is wrong", "WHERE is wrong", "SELECT is wrong"], answer: 0, explanation: "In most databases, LIKE is case-sensitive. Use ILIKE or LOWER(name) for case-insensitive search." },
-    ],
-    medium: [
-      { code: `SELECT dept, COUNT(*)\nFROM employees\nWHERE COUNT(*) > 5\nGROUP BY dept;`, error: "Cannot use aggregate in WHERE", options: ["COUNT(*) in WHERE is invalid — use HAVING after GROUP BY", "SELECT is wrong", "GROUP BY is wrong", "FROM is wrong"], answer: 0, explanation: "Aggregate functions can't appear in WHERE. Use HAVING to filter aggregated results." },
-      { code: `SELECT * FROM orders\nLEFT JOIN users ON orders.user_id = users.id\nWHERE users.name = 'Alice';`, error: "WHERE on LEFT JOIN nullifies the outer join", options: ["WHERE on right table column turns LEFT JOIN into INNER JOIN", "LEFT JOIN is wrong", "SELECT is wrong", "ON is wrong"], answer: 0, explanation: "Filtering on the right table in WHERE eliminates NULLs, effectively making it an INNER JOIN." },
-      { code: `SELECT name, salary\nFROM employees\nORDER BY 3;`, error: "ORDER BY column index out of range", options: ["Only 2 columns selected — ORDER BY 3 is out of range", "SELECT is wrong", "FROM is wrong", "ORDER BY is wrong"], answer: 0, explanation: "ORDER BY 3 refers to the 3rd column, but only 2 columns are selected." },
-      { code: `SELECT e.name, d.name\nFROM employees e\nJOIN departments d ON e.dept = d.id\nGROUP BY e.name;`, error: "d.name not in GROUP BY or aggregate", options: ["d.name must be in GROUP BY or wrapped in aggregate function", "JOIN is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "In SQL, all non-aggregate columns in SELECT must appear in GROUP BY." },
-      { code: `SELECT * FROM users\nUNION\nSELECT id, name, email FROM orders;`, error: "UNION column count mismatch", options: ["Both SELECT statements must have same number of columns", "UNION is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "UNION requires both queries to have the same number of columns with compatible types." },
-      { code: `UPDATE employees\nSET salary = salary * 1.1;`, error: "Missing WHERE — updates all rows", options: ["No WHERE clause — ALL employee salaries will be updated", "UPDATE is wrong", "SET is wrong", "salary is wrong"], answer: 0, explanation: "Without WHERE, UPDATE affects every row in the table. Always add WHERE for targeted updates." },
-      { code: `SELECT * FROM orders\nLEFT JOIN users ON orders.user_id = users.id\nWHERE users.name = 'Alice';`, error: "WHERE filter turns LEFT JOIN into INNER JOIN", options: ["Filtering right-side column in WHERE negates LEFT JOIN behavior", "LEFT JOIN is wrong", "ON is wrong", "SELECT is wrong"], answer: 0, explanation: "Rows where users.name is NULL (no match) are excluded by WHERE, effectively making it INNER JOIN." },
-      { code: `CREATE TABLE users (\n    id INT PRIMARY KEY,\n    email VARCHAR(100) UNIQUE NOT NULL,\n    id INT\n);`, error: "Duplicate column definition", options: ["id column defined twice in CREATE TABLE", "PRIMARY KEY is wrong", "UNIQUE is wrong", "VARCHAR is wrong"], answer: 0, explanation: "Each column name must be unique within a table definition. id appears twice." },
-      { code: `SELECT * FROM users\nWHERE id IN (\n    SELECT user_id FROM orders\n    WHERE total > 1000\n    ORDER BY total\n);`, error: "ORDER BY inside subquery is meaningless", options: ["ORDER BY in subquery used with IN has no effect", "IN is wrong", "SELECT is wrong", "WHERE is wrong"], answer: 0, explanation: "ORDER BY inside a subquery used with IN doesn't affect results — the outer query determines order." },
-      { code: `WITH cte AS (\n    SELECT * FROM orders WHERE total > 100\n)\nSELECT * FROM cte\nWHERE cte.total > 200;`, error: "Redundant filter — already filtered in CTE", options: ["CTE already filters total > 100 — outer WHERE repeats logic redundantly", "WITH is wrong", "SELECT is wrong", "WHERE is wrong"], answer: 0, explanation: "Not an error per se, but a logic issue — the CTE already guarantees total > 100, so the outer WHERE adds confusion." },
-    ],
-    hard: [
-      { code: `SELECT *\nFROM employees\nWHERE salary > AVG(salary);`, error: "Aggregate in WHERE", options: ["Cannot use AVG() in WHERE — use a subquery instead", "SELECT is wrong", "WHERE is wrong", "salary is wrong"], answer: 0, explanation: "Aggregates can't be in WHERE. Use: WHERE salary > (SELECT AVG(salary) FROM employees)." },
-      { code: `SELECT RANK() OVER (ORDER BY salary) as rnk\nFROM employees\nWHERE rnk > 5;`, error: "Cannot reference window function alias in WHERE", options: ["Window function alias can't be used in WHERE — use subquery or CTE", "RANK is wrong", "OVER is wrong", "ORDER BY is wrong"], answer: 0, explanation: "WHERE is processed before SELECT, so window function aliases aren't available. Wrap in a subquery." },
-      { code: `BEGIN TRANSACTION;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;`, error: "Missing COMMIT or ROLLBACK", options: ["Transaction never committed or rolled back — changes may be lost", "BEGIN is wrong", "UPDATE is wrong", "balance is wrong"], answer: 0, explanation: "A transaction without COMMIT or ROLLBACK leaves changes in a pending state." },
-      { code: `SELECT *\nFROM users u\nJOIN orders o ON u.id = o.user_id\nJOIN products p ON o.id = p.order_id\nWHERE p.price > 100\nAND u.country = 'US';`, error: "Missing index — potential performance issue", options: ["No indexes on join/filter columns — query will do full table scans", "JOIN is wrong", "WHERE is wrong", "SELECT is wrong"], answer: 0, explanation: "Without indexes on user_id, order_id, price, country — all joins and filters require full scans." },
-      { code: `SELECT DISTINCT dept, COUNT(*) as cnt\nFROM employees\nGROUP BY dept;`, error: "DISTINCT is redundant with GROUP BY", options: ["GROUP BY already ensures distinct dept values — DISTINCT is redundant", "SELECT is wrong", "COUNT is wrong", "FROM is wrong"], answer: 0, explanation: "GROUP BY already produces unique groups. Adding DISTINCT has no effect and misleads the reader." },
-      { code: `ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT NOW();\nSELECT * FROM users WHERE created_at = NOW();`, error: "Exact timestamp comparison is unreliable", options: ["NOW() returns current moment — almost no rows will match exactly", "ALTER is wrong", "SELECT is wrong", "WHERE is wrong"], answer: 0, explanation: "Timestamps are precise to microseconds. Comparing with = NOW() almost never matches. Use a range instead." },
-      { code: `CREATE INDEX idx ON users(email);\nSELECT * FROM users WHERE LOWER(email) = 'alice@example.com';`, error: "Index not used due to function on column", options: ["LOWER(email) prevents index idx from being used", "CREATE INDEX is wrong", "WHERE is wrong", "SELECT is wrong"], answer: 0, explanation: "Applying a function to an indexed column prevents index usage. Use a functional index on LOWER(email)." },
-      { code: `SELECT u.name, SUM(o.total) as revenue\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nGROUP BY u.id;`, error: "Selecting u.name not in GROUP BY (in strict SQL)", options: ["u.name not in GROUP BY — fails in strict SQL mode", "LEFT JOIN is wrong", "SUM is wrong", "FROM is wrong"], answer: 0, explanation: "In strict SQL (e.g., PostgreSQL), all non-aggregate SELECT columns must be in GROUP BY. Add u.name to GROUP BY." },
-      { code: `SELECT name, salary,\n    LAG(salary) OVER (ORDER BY salary) as prev\nFROM employees\nORDER BY name;`, error: "LAG ordered by salary but results ordered by name — misleading", options: ["LAG uses salary order but final ORDER BY name changes display — confusing", "LAG is wrong", "OVER is wrong", "SELECT is wrong"], answer: 0, explanation: "LAG calculates based on salary order, but final output is sorted by name, making prev values misleading." },
-      { code: `INSERT INTO logs (user_id, action)\nSELECT id, 'login'\nFROM users\nWHERE last_login < NOW() - INTERVAL '30 days';`, error: "Logic error — inserting for inactive users", options: ["Inserts login action for users who haven't logged in 30 days — likely wrong intent", "INSERT is wrong", "SELECT is wrong", "WHERE is wrong"], answer: 0, explanation: "The WHERE clause selects users who haven't logged in for 30 days, but we're logging a 'login' action — a logic error." },
-    ],
-  },
-  webdev: {
-    easy: [
-      { code: `<img src="photo.jpg">`, error: "Missing alt attribute", options: ["Missing alt attribute for accessibility", "src is wrong", "img is wrong", "photo.jpg is wrong"], answer: 0, explanation: "All <img> elements should have an alt attribute for accessibility and SEO." },
-      { code: `<a href=google.com>Visit Google</a>`, error: "href value not quoted", options: ["URL must be in quotes: href=\"google.com\"", "a tag is wrong", "Visit is wrong", "href is wrong"], answer: 0, explanation: "HTML attribute values must be wrapped in quotes." },
-      { code: `.box {\n    colour: red;\n}`, error: "Wrong CSS property name", options: ["'colour' is wrong spelling — should be 'color'", ".box is wrong", "red is wrong", ": is wrong"], answer: 0, explanation: "CSS uses American English spelling. The property is 'color', not 'colour'." },
-      { code: `document.getElementByID("btn")`, error: "Wrong method name casing", options: ["Should be getElementById (lowercase 'd' in Id)", "document is wrong", "btn is wrong", "getElement is wrong"], answer: 0, explanation: "The correct method name is getElementById — capital B and lowercase d in 'ById'." },
-      { code: `<div>\n    <p>Hello</div>\n</p>`, error: "Improper tag nesting", options: ["Tags must be closed in the correct order — </p> before </div>", "div is wrong", "p is wrong", "Hello is wrong"], answer: 0, explanation: "HTML tags must be closed in reverse order of opening. </p> should come before </div>." },
-      { code: `let x == 5;`, error: "== used for assignment", options: ["Should use = for assignment, not ==", "let is wrong", "x is wrong", "5 is wrong"], answer: 0, explanation: "= assigns a value. == is a comparison operator. let x = 5 is correct." },
-      { code: `.container {\n    display: flexbox;\n}`, error: "Wrong flexbox value", options: ["Should be display: flex not display: flexbox", "container is wrong", "display is wrong", ": is wrong"], answer: 0, explanation: "The correct CSS value is 'flex', not 'flexbox'." },
-      { code: `console.log(myVar);\nlet myVar = "hello";`, error: "Variable used before declaration (temporal dead zone)", options: ["let variables can't be accessed before their declaration", "console.log is wrong", "myVar is wrong", "let is wrong"], answer: 0, explanation: "let and const have a temporal dead zone — they can't be accessed before their declaration line." },
-      { code: `<style>\n    p {\n        font-size: 16;\n    }\n</style>`, error: "Missing CSS unit", options: ["Font-size needs a unit: 16px, 16em, etc.", "style is wrong", "p is wrong", "font-size is wrong"], answer: 0, explanation: "CSS values need units. 16 alone is invalid — use 16px, 16rem, 16em, etc." },
-      { code: `<input type="text" placeholder="Name" /\n<button>Submit</button>`, error: "Missing closing > on input tag", options: ["Input tag missing closing > before newline", "input is wrong", "placeholder is wrong", "button is wrong"], answer: 0, explanation: "The input self-closing tag needs /> not /\\n. The > is missing." },
-    ],
-    medium: [
-      { code: `useEffect(() => {\n    fetchData();\n});`, error: "Missing dependency array causes infinite loop", options: ["No dependency array — effect runs after every render causing infinite loop", "useEffect is wrong", "fetchData is wrong", "() => is wrong"], answer: 0, explanation: "Without [], the effect runs after every render. fetchData likely updates state, causing infinite re-renders." },
-      { code: `fetch('https://api.example.com/data')\n    .then(response => response.json)\n    .then(data => console.log(data));`, error: "Missing parentheses on .json()", options: ["response.json is a method — must call it as response.json()", "fetch is wrong", "then is wrong", "console.log is wrong"], answer: 0, explanation: ".json is a method reference, not a call. It must be .json() to actually parse the response." },
-      { code: `const [count, setCount] = useState(0);\ncount = 5;`, error: "Directly mutating state", options: ["Cannot assign to const count — use setCount(5) instead", "useState is wrong", "const is wrong", "setCount is wrong"], answer: 0, explanation: "React state must be updated via the setter function. Direct assignment doesn't trigger re-render." },
-      { code: `localStorage.setItem('user', {name: 'Alice'});`, error: "Object not serialized before storage", options: ["Objects must be JSON.stringify'd before localStorage.setItem", "localStorage is wrong", "setItem is wrong", "user is wrong"], answer: 0, explanation: "localStorage only stores strings. Pass JSON.stringify({name: 'Alice'}) as the value." },
-      { code: `document.querySelector('#btn').addEventListener('click', handleClick())`, error: "Function called immediately instead of passed as reference", options: ["handleClick() calls the function immediately — should be handleClick without ()", "addEventListener is wrong", "querySelector is wrong", "click is wrong"], answer: 0, explanation: "handleClick() calls the function right away and passes its return value. Use handleClick (no parens) as the callback." },
-      { code: `@media (max-width: 768) {\n    .nav { display: none; }\n}`, error: "Missing px unit in media query", options: ["Should be max-width: 768px not just 768", "@media is wrong", ".nav is wrong", "display is wrong"], answer: 0, explanation: "Media query values need units. Use max-width: 768px." },
-      { code: `const obj = {name: 'Alice'};\nconst copy = obj;\ncopy.name = 'Bob';\nconsole.log(obj.name);`, error: "Object reference copied not cloned", options: ["copy = obj copies reference — both point to same object", "const is wrong", "copy is wrong", "console.log is wrong"], answer: 0, explanation: "Objects are reference types. copy = obj makes both variables point to the same object. Use {...obj} to clone." },
-      { code: `async function getData() {\n    const data = fetch('https://api.example.com');\n    return data.json();\n}`, error: "Missing await before fetch", options: ["Missing await before fetch — data is a Promise not a Response", "async is wrong", "return is wrong", "json is wrong"], answer: 0, explanation: "Without await, data is a Promise object. You can't call .json() on a Promise." },
-      { code: `for (var i = 0; i < 3; i++) {\n    setTimeout(() => console.log(i), 1000);\n}`, error: "var closure captures final value", options: ["var is function-scoped — all callbacks print 3 not 0,1,2", "for is wrong", "setTimeout is wrong", "console.log is wrong"], answer: 0, explanation: "var i is shared across all iterations. By the time callbacks run, i is 3. Use let instead." },
-      { code: `div {\n    position: relative;\n    top: 50%;\n    left: 50%;\n}`, error: "Centering with % doesn't center the element", options: ["top/left 50% positions the corner, not the center — add transform: translate(-50%,-50%)", "position is wrong", "div is wrong", "% is wrong"], answer: 0, explanation: "top/left 50% moves the element's top-left corner to center. Add transform: translate(-50%, -50%) to truly center it." },
-    ],
-    hard: [
-      { code: `const MyComponent = React.memo(({ data }) => {\n    return <div>{data.map(d => <span>{d}</span>)}</div>;\n});`, error: "Missing key prop in mapped elements", options: ["Each <span> in map needs a unique key prop", "React.memo is wrong", "data.map is wrong", "return is wrong"], answer: 0, explanation: "React requires a unique key prop for list items to efficiently reconcile the DOM." },
-      { code: `useEffect(() => {\n    const id = setInterval(tick, 1000);\n}, []);`, error: "Missing cleanup for interval", options: ["setInterval not cleared — causes memory leak when component unmounts", "useEffect is wrong", "setInterval is wrong", "tick is wrong"], answer: 0, explanation: "Return a cleanup function: return () => clearInterval(id) to prevent memory leaks on unmount." },
-      { code: `fetch('/api/data', {\n    method: 'POST',\n    body: {name: 'Alice'}\n});`, error: "Object body not stringified", options: ["body must be JSON.stringify'd — objects are sent as [object Object]", "fetch is wrong", "method is wrong", "body is wrong"], answer: 0, explanation: "fetch body needs to be a string. Use JSON.stringify({name: 'Alice'}) and add Content-Type header." },
-      { code: `window.addEventListener('resize', () => {\n    updateLayout();\n});`, error: "Resize handler not debounced", options: ["resize fires hundreds of times per second — should be debounced", "addEventListener is wrong", "resize is wrong", "updateLayout is wrong"], answer: 0, explanation: "The resize event fires very frequently. Without debouncing, updateLayout runs too many times." },
-      { code: `class MyComponent extends React.Component {\n    state = { count: 0 };\n    increment = () => {\n        this.setState({ count: this.state.count + 1 });\n        this.setState({ count: this.state.count + 1 });\n    }\n}`, error: "Stale state in multiple setState calls", options: ["this.state.count is stale in second setState — use functional update", "setState is wrong", "state is wrong", "increment is wrong"], answer: 0, explanation: "setState is async. Both calls read the same stale count. Use setState(prev => ({count: prev.count + 1}))." },
-      { code: `const secret = process.env.API_KEY;\nfetch(\`https://api.com?key=\${secret}\`);`, error: "Exposing secret API key in client-side code", options: ["Client-side env vars are exposed in the browser — never put secrets in frontend", "fetch is wrong", "process.env is wrong", "const is wrong"], answer: 0, explanation: "Anything in client-side JavaScript is visible to users. API secrets must stay on the server." },
-      { code: `element.innerHTML = userInput;`, error: "XSS vulnerability", options: ["Setting innerHTML with user input allows XSS attacks", "innerHTML is wrong", "element is wrong", "= is wrong"], answer: 0, explanation: "Using innerHTML with unsanitized user input allows attackers to inject malicious scripts (XSS)." },
-      { code: `img {\n    width: 100%;\n    height: 100%;\n}`, error: "height 100% without defined parent height", options: ["height: 100% has no effect unless parent has a defined height", "img is wrong", "width is wrong", "% is wrong"], answer: 0, explanation: "Percentage heights require the parent to have an explicit height. Otherwise height: 100% is ignored." },
-      { code: `const router = useRouter();\nrouter.push('/dashboard');\nwindow.location.href = '/dashboard';`, error: "Redundant double navigation", options: ["Both push and location.href navigate — causes double redirect", "useRouter is wrong", "push is wrong", "window is wrong"], answer: 0, explanation: "Using both router.push and window.location.href causes double navigation. Use only one." },
-      { code: `const value = useMemo(() => expensiveCalc(), []);`, error: "Function called inside useMemo", options: ["expensiveCalc() is called immediately — should be just expensiveCalc or inline logic", "useMemo is wrong", "const is wrong", "[] is wrong"], answer: 0, explanation: "useMemo expects the computation inline: useMemo(() => expensiveCalc(), []). Calling it inside the arrow function is actually fine — the real anti-pattern is passing expensiveCalc() outside." },
-    ],
-  },
+
   c: {
     easy: [
-      { code: `#include <stdio.h>\nint main() {\n    printf("Hello")\n    return 0;\n}`, error: "Missing semicolon", options: ["Missing semicolon after printf statement", "include is wrong", "return is wrong", "main is wrong"], answer: 0, explanation: "Every statement in C must end with a semicolon ';'." },
-      { code: `int x;\nprintf("%d", x);`, error: "Uninitialized variable", options: ["x is declared but not initialized — undefined behavior", "printf is wrong", "%d is wrong", "int is wrong"], answer: 0, explanation: "Using an uninitialized variable gives undefined behavior. Initialize x before use." },
-      { code: `char name[5] = "hello!";`, error: "String too long for array", options: ["'hello!' is 6 chars + null terminator = 7 bytes, array too small", "char is wrong", "= is wrong", "name is wrong"], answer: 0, explanation: "'hello!' has 6 characters plus a null terminator = 7 bytes. The array needs at least char[7]." },
-      { code: `int arr[3] = {1, 2, 3};\nprintf("%d", arr[3]);`, error: "Array out of bounds", options: ["Index 3 is out of bounds for array of size 3", "printf is wrong", "%d is wrong", "arr is wrong"], answer: 0, explanation: "Valid indices are 0-2. arr[3] accesses memory beyond the array." },
-      { code: `int* ptr = NULL;\n*ptr = 42;`, error: "Null pointer dereference", options: ["Dereferencing NULL pointer causes segfault", "int* is wrong", "42 is wrong", "NULL is wrong"], answer: 0, explanation: "Dereferencing a NULL pointer causes a segmentation fault." },
-      { code: `printf("%s", 42);`, error: "Wrong format specifier for int", options: ["42 is an int but %s expects a string — undefined behavior", "printf is wrong", "42 is wrong", "%s is wrong"], answer: 0, explanation: "%s expects a char* string pointer. Use %d to print an integer." },
-      { code: `for (int i = 0; i <= 10; i++) {\n    arr[i] = i;\n}`, error: "Off-by-one error — writes to index 10", options: ["i <= 10 writes 11 elements but array likely has only 10 slots", "for is wrong", "arr is wrong", "int is wrong"], answer: 0, explanation: "If arr has 10 elements, valid indices are 0-9. i <= 10 writes to index 10, which is out of bounds." },
-      { code: `int x = 5;\nif (x = 0) {\n    printf("zero");\n}`, error: "Assignment instead of comparison in if", options: ["x = 0 assigns 0 to x — should use x == 0 for comparison", "if is wrong", "printf is wrong", "int is wrong"], answer: 0, explanation: "= assigns a value (always false for 0). Use == to compare. This sets x to 0 and the block never executes." },
-      { code: `void greet() {\n    char msg[] = "Hello";\n}\nchar* p = greet();`, error: "Function returns void, not pointer", options: ["greet() returns void — cannot assign to char*", "void is wrong", "char is wrong", "p is wrong"], answer: 0, explanation: "greet() has void return type. It cannot return a value. The assignment is invalid." },
-      { code: `int main() {\n    int x = 10;\n    int x = 20;\n    return 0;\n}`, error: "Duplicate variable declaration", options: ["x is declared twice in the same scope", "int is wrong", "return is wrong", "main is wrong"], answer: 0, explanation: "A variable can only be declared once in the same scope." },
+      { code: `#include <stdio.h>\nint main() {\n    printf("Hello World")\n    return 0;\n}`, error: "Missing semicolon after printf", options: ["Missing semicolon after printf statement", "printf is wrong", "#include is wrong", "return is wrong"], answer: 0, explanation: "Every statement in C must end with a semicolon ';'." },
+      { code: `#include <stdio.h>\nint main() {\n    int x = 10\n    printf("%d", x);\n    return 0;\n}`, error: "Missing semicolon after variable declaration", options: ["Missing semicolon after int x = 10", "int is wrong type", "printf format is wrong", "return is wrong"], answer: 0, explanation: "Variable declarations in C must end with a semicolon." },
+      { code: `#include <stdio.h>\nint main() {\n    int arr[3] = {1, 2, 3};\n    printf("%d", arr[3]);\n    return 0;\n}`, error: "Array index out of bounds", options: ["arr[3] is out of bounds, valid indices are 0-2", "arr declaration is wrong", "printf format is wrong", "int is wrong"], answer: 0, explanation: "Array arr[3] has indices 0, 1, 2. Accessing index 3 is undefined behavior." },
+      { code: `#include <stdio.h>\nvoid greet() {\n    printf("Hi!");\n}\nint main() {\n    greet;\n    return 0;\n}`, error: "Function called without parentheses", options: ["greet should be greet() to call the function", "void is wrong", "printf is wrong", "return is wrong"], answer: 0, explanation: "In C, 'greet' without () is just a reference to the function, not a call." },
+      { code: `#include <stdio.h>\nint main() {\n    int x;\n    printf("%d", x);\n    return 0;\n}`, error: "Uninitialized variable used", options: ["x is declared but never initialized — undefined behavior", "int is wrong", "printf is wrong", "return is wrong"], answer: 0, explanation: "Using an uninitialized variable in C leads to undefined behavior." },
+      { code: `#include <stdio.h>\nint main() {\n    float pi = 3.14;\n    printf("%d", pi);\n    return 0;\n}`, error: "Wrong format specifier for float", options: ["Use %f for float, not %d (which is for int)", "float is wrong", "pi value is wrong", "printf is wrong"], answer: 0, explanation: "%d is for integers. Use %f for float values." },
+      { code: `#include <stdio.h>\nint main() {\n    int x = 5;\n    if (x = 10) {\n        printf("ten");\n    }\n    return 0;\n}`, error: "Assignment instead of comparison", options: ["Use == for comparison, = assigns value", "int is wrong", "printf is wrong", "if syntax is wrong"], answer: 0, explanation: "x = 10 assigns 10 to x (always true). Use x == 10 to compare." },
+      { code: `#include <stdio.h>\nint add(int a, int b) {\n    return a + b;\n}\nint main() {\n    printf("%d", add(3));\n    return 0;\n}`, error: "Wrong number of arguments", options: ["add() requires 2 arguments, only 1 passed", "int is wrong", "return is wrong", "printf is wrong"], answer: 0, explanation: "The function add(int a, int b) requires two arguments but only one was provided." },
+      { code: `#include <stdio.h>\nint main() {\n    char name = "Alice";\n    printf("%s", name);\n    return 0;\n}`, error: "char cannot hold a string", options: ["Use char name[] or char* name for strings, not char", "printf is wrong", "Alice needs escaping", "printf format is wrong"], answer: 0, explanation: "A single char holds one character. Use char[] or char* to store strings." },
+      { code: `#include <stdio.h>\nint main() {\n    for (int i = 0; i < 5; i++)\n        printf("%d ", i);\n        printf("done");\n    return 0;\n}`, error: "printf('done') not inside loop", options: ["No braces means only first printf is in the loop", "i++ is wrong", "printf is wrong", "int i = 0 is wrong"], answer: 0, explanation: "Without curly braces, only the immediately following statement is in the loop body." },
     ],
     medium: [
-      { code: `char* str = malloc(5);\nstrcpy(str, "hello!");\nfree(str);`, error: "Buffer overflow in strcpy", options: ["'hello!' is 7 bytes but only 5 allocated — buffer overflow", "malloc is wrong", "free is wrong", "char* is wrong"], answer: 0, explanation: "'hello!' plus null terminator is 7 bytes. malloc(5) only allocates 5. strcpy writes beyond the buffer." },
-      { code: `int* p = malloc(sizeof(int));\n*p = 42;\nfree(p);\nfree(p);`, error: "Double free", options: ["Freeing the same pointer twice is undefined behavior", "malloc is wrong", "*p is wrong", "int* is wrong"], answer: 0, explanation: "Calling free() twice on the same pointer corrupts the heap. Set p = NULL after freeing." },
-      { code: `void process(int arr[], int n) {\n    for (int i = 0; i <= n; i++)\n        printf("%d ", arr[i]);\n}`, error: "Off-by-one in loop", options: ["i <= n accesses arr[n] which is one past the end", "for is wrong", "printf is wrong", "arr is wrong"], answer: 0, explanation: "Loop should be i < n. i <= n accesses arr[n], which is out of bounds." },
-      { code: `int* create() {\n    int arr[5] = {1,2,3,4,5};\n    return arr;\n}`, error: "Returning pointer to local array", options: ["arr is a local variable — destroyed when function returns", "int* is wrong", "return is wrong", "create is wrong"], answer: 0, explanation: "Local arrays are on the stack and destroyed on function exit. Use malloc() to allocate on heap." },
-      { code: `char buf[10];\ngets(buf);`, error: "gets() is unsafe — no bounds checking", options: ["gets() has no length limit — vulnerable to buffer overflow", "char is wrong", "buf is wrong", "10 is wrong"], answer: 0, explanation: "gets() was removed from C11 due to buffer overflow vulnerability. Use fgets(buf, 10, stdin) instead." },
-      { code: `int a = 5, b = 3;\nfloat result = a / b;`, error: "Integer division before float assignment", options: ["a/b is integer division (1) before being assigned to float", "float is wrong", "result is wrong", "= is wrong"], answer: 0, explanation: "a and b are ints, so a/b = 1 (truncated). Cast first: (float)a / b to get 1.666..." },
-      { code: `char* p = "hello";\np[0] = 'H';`, error: "Modifying string literal", options: ["String literals are read-only — modification causes undefined behavior", "char* is wrong", "p is wrong", "= is wrong"], answer: 0, explanation: "String literals are stored in read-only memory. Use char p[] = \"hello\" to get a modifiable copy." },
-      { code: `int arr[5];\nmemset(arr, 1, sizeof(arr));`, error: "memset sets bytes not int values", options: ["memset(arr,1,...) sets each byte to 1, not each int to 1", "memset is wrong", "sizeof is wrong", "arr is wrong"], answer: 0, explanation: "memset fills byte-by-byte. Setting bytes to 1 gives 0x01010101 (16843009) for each int, not 1." },
-      { code: `int x = 10;\nvoid foo() {\n    int x = 20;\n    printf(\"%d\", x);\n}\nfoo();\nprintf(\"%d\", x);`, error: "Variable shadowing may cause confusion", options: ["Local x shadows global x inside foo — foo prints 20 not 10", "void is wrong", "printf is wrong", "int is wrong"], answer: 0, explanation: "Local x in foo shadows the global x. foo prints 20. The global x is unaffected." },
-      { code: `typedef struct {\n    int x;\n    struct Node* next;\n} Node;`, error: "Struct not yet defined when referenced", options: ["struct Node* inside typedef references Node before it's defined", "typedef is wrong", "int is wrong", "next is wrong"], answer: 0, explanation: "Inside the typedef, 'struct Node' doesn't exist yet. Use 'struct Node { ... struct Node* next; };' separately." },
+      { code: `#include <stdio.h>\nint* getVal() {\n    int x = 10;\n    return &x;\n}`, error: "Returning address of local variable", options: ["x is local — its memory is freed when function returns", "int* is wrong", "return is wrong", "x = 10 is wrong"], answer: 0, explanation: "Local variables are on the stack and become invalid after the function returns." },
+      { code: `#include <string.h>\nchar s1[5] = "Hello";\nchar s2[] = "World";\nstrcat(s1, s2);`, error: "Buffer overflow in strcat", options: ["s1 has only 5 bytes, not enough for Hello+World", "strcat is wrong", "s2 is wrong", "char is wrong"], answer: 0, explanation: "s1 has room for 5 chars. strcat(s1, s2) would write beyond the buffer." },
+      { code: `#include <stdio.h>\nint main() {\n    int* p = NULL;\n    *p = 10;\n    return 0;\n}`, error: "Null pointer dereference", options: ["Dereferencing NULL pointer causes segfault", "int* is wrong", "NULL is wrong", "= 10 is wrong"], answer: 0, explanation: "Dereferencing a NULL pointer causes a segmentation fault." },
+      { code: `#include <stdlib.h>\nint main() {\n    int* arr = malloc(5 * sizeof(int));\n    arr[0] = 1;\n    return 0;\n}`, error: "Memory leak — free() not called", options: ["malloc'd memory is never freed with free(arr)", "malloc is wrong", "sizeof is wrong", "arr[0] is wrong"], answer: 0, explanation: "Heap memory allocated with malloc must be freed with free() to avoid memory leaks." },
+      { code: `#include <stdio.h>\nint main() {\n    int x = 5;\n    printf("%d %d", x++, x++);\n    return 0;\n}`, error: "Undefined behavior — multiple increments", options: ["Modifying x twice in same expression is undefined behavior", "printf is wrong", "x++ is wrong syntax", "%d is wrong"], answer: 0, explanation: "Evaluating x++ twice in the same function call is undefined behavior in C." },
+      { code: `#include <stdio.h>\nint main() {\n    int a = 10, b = 0;\n    printf("%d", a / b);\n    return 0;\n}`, error: "Division by zero", options: ["Dividing by b = 0 causes undefined behavior / crash", "int is wrong", "printf is wrong", "a = 10 is wrong"], answer: 0, explanation: "Integer division by zero is undefined behavior in C and will typically crash." },
+      { code: `#include <stdio.h>\nvoid swap(int a, int b) {\n    int t = a; a = b; b = t;\n}\nint main() {\n    int x = 1, y = 2;\n    swap(x, y);\n    printf("%d %d", x, y);\n}`, error: "Pass by value — swap has no effect", options: ["C passes by value; changes inside swap don't affect x and y", "int t is wrong", "printf is wrong", "swap function is wrong"], answer: 0, explanation: "C is pass-by-value. swap modifies local copies, not the originals. Use pointers." },
+      { code: `#include <stdio.h>\nint main() {\n    int arr[3];\n    int n = sizeof(arr) / sizeof(int);\n    for(int i = 0; i <= n; i++)\n        printf("%d", arr[i]);\n}`, error: "Off-by-one error in loop", options: ["i <= n accesses arr[3] which is out of bounds", "sizeof is wrong", "int n is wrong", "printf is wrong"], answer: 0, explanation: "Loop should be i < n (not <=). i <= n accesses arr[3] which is out of bounds." },
+      { code: `#include <stdio.h>\n#include <string.h>\nint main() {\n    char* s = "Hello";\n    s[0] = 'h';\n    printf("%s", s);\n}`, error: "Modifying string literal is undefined behavior", options: ["String literals are read-only; modification is undefined behavior", "char* is wrong", "s[0] syntax is wrong", "printf is wrong"], answer: 0, explanation: "String literals are stored in read-only memory. Use char s[] = \"Hello\" instead." },
+      { code: `#include <stdio.h>\nint main() {\n    int x = 2147483647;\n    x = x + 1;\n    printf("%d", x);\n}`, error: "Integer overflow", options: ["Adding 1 to INT_MAX causes signed integer overflow", "int is wrong", "printf is wrong", "x + 1 is wrong"], answer: 0, explanation: "2147483647 is INT_MAX. Adding 1 causes signed integer overflow, which is undefined behavior." },
     ],
     hard: [
-      { code: `int* a = malloc(10 * sizeof(int));\nint* b = a;\nfree(a);\nprintf(\"%d\", b[0]);`, error: "Use after free via aliased pointer", options: ["b aliases a — after free(a), b[0] is undefined behavior", "malloc is wrong", "free is wrong", "printf is wrong"], answer: 0, explanation: "b and a point to same memory. After free(a), accessing b[0] is use-after-free — undefined behavior." },
-      { code: `int x = INT_MAX;\nx = x + 1;`, error: "Signed integer overflow", options: ["INT_MAX + 1 overflows signed int — undefined behavior", "int is wrong", "INT_MAX is wrong", "= is wrong"], answer: 0, explanation: "Signed integer overflow is undefined behavior in C. The result is unpredictable." },
-      { code: `#define SQUARE(x) x * x\nint result = SQUARE(2 + 3);`, error: "Macro expansion without parentheses", options: ["Expands to 2+3*2+3 = 11 not 25 — macro args need parens", "#define is wrong", "result is wrong", "int is wrong"], answer: 0, explanation: "SQUARE(2+3) expands to 2+3*2+3 = 11 due to operator precedence. Use #define SQUARE(x) ((x)*(x))." },
-      { code: `int flag = 0;\nvoid handler(int sig) { flag = 1; }\nwhile (!flag) { /* wait */ }`, error: "flag not declared volatile — compiler may optimize loop away", options: ["flag must be volatile sig_atomic_t for signal handlers", "int is wrong", "while is wrong", "handler is wrong"], answer: 0, explanation: "Without volatile, compiler may cache flag in register and loop forever. Use volatile sig_atomic_t flag." },
-      { code: `int arr[3] = {0};\nfor (int i = 0; i < 3; i++)\n    arr[i] = arr[i+1] + 1;`, error: "Reads arr[3] which is out of bounds", options: ["arr[i+1] when i=2 accesses arr[3] — out of bounds", "for is wrong", "arr is wrong", "int is wrong"], answer: 0, explanation: "When i=2, arr[i+1] = arr[3] which is past the array end — undefined behavior." },
-      { code: `char buf[8];\nsprintf(buf, \"%s\", longString);`, error: "sprintf with no length limit — buffer overflow risk", options: ["sprintf doesn't check buf size — use snprintf(buf, 8, ...)", "char is wrong", "buf is wrong", "sprintf is wrong"], answer: 0, explanation: "sprintf writes without length checking. If longString > 7 chars, buffer overflows. Use snprintf." },
-      { code: `typedef void (*Callback)(int);\nCallback cb;\ncb(42);`, error: "Uninitialized function pointer called", options: ["cb is never assigned — calling uninitialized function pointer is UB", "typedef is wrong", "Callback is wrong", "42 is wrong"], answer: 0, explanation: "cb is declared but never assigned a function. Calling it dereferences a garbage address — undefined behavior." },
-      { code: `int main() {\n    static int count = 0;\n    count++;\n    main();\n}`, error: "Infinite recursion — stack overflow", options: ["main() calls itself infinitely — stack overflows", "static is wrong", "count is wrong", "return is missing"], answer: 0, explanation: "Recursive calls to main without a base case exhaust the call stack, causing a stack overflow." },
-      { code: `void copy(char* dst, char* src) {\n    while (*dst++ = *src++);\n}`, error: "No null check — undefined if src is NULL", options: ["If src is NULL, *src++ dereferences NULL — segfault", "while is wrong", "dst is wrong", "char* is wrong"], answer: 0, explanation: "The function doesn't validate src. If NULL is passed, dereferencing causes a segmentation fault." },
-      { code: `void foo(int n) {\n    int arr[n];\n    // use arr\n}`, error: "VLA may cause stack overflow for large n", options: ["Variable-length arrays on stack can overflow for large n", "void is wrong", "int is wrong", "arr is wrong"], answer: 0, explanation: "VLAs are allocated on the stack. If n is large, this causes a stack overflow. Use malloc for large arrays." },
+      { code: `#include <stdio.h>\nint main() {\n    char* p;\n    scanf("%s", p);\n    printf("%s", p);\n}`, error: "Uninitialized pointer used with scanf", options: ["p is uninitialized — no memory allocated for input", "scanf is wrong", "printf is wrong", "char* is wrong"], answer: 0, explanation: "p is an uninitialized pointer. scanf writes to an unknown memory location." },
+      { code: `#include <stdlib.h>\nvoid process(int n) {\n    int* arr = malloc(n * sizeof(int));\n    if (!arr) return;\n    arr[n] = 0;\n    free(arr);\n}`, error: "Off-by-one buffer overflow", options: ["arr[n] writes past the allocated n elements (valid: 0..n-1)", "malloc is wrong", "free is wrong", "if !arr is wrong"], answer: 0, explanation: "malloc(n) allocates n elements with valid indices 0 to n-1. arr[n] is one past the end." },
+      { code: `#include <stdlib.h>\nint main() {\n    int* p = malloc(sizeof(int));\n    *p = 42;\n    free(p);\n    *p = 100;\n}`, error: "Use after free", options: ["Accessing *p after free(p) is undefined behavior", "malloc is wrong", "free is wrong", "int* is wrong"], answer: 0, explanation: "Accessing memory after calling free() on it is undefined behavior (use-after-free)." },
+      { code: `#include <stdio.h>\nint main() {\n    int x = 0;\n    int y = (x = 5) && (x = 10);\n    printf("%d", x);\n}`, error: "Sequence point / undefined evaluation order", options: ["Assigning x twice between sequence points is undefined behavior", "int y is wrong", "printf is wrong", "&& is wrong"], answer: 0, explanation: "Modifying x twice without intervening sequence points is undefined behavior." },
+      { code: `typedef struct Node {\n    int data;\n    Node* next;\n} Node;`, error: "Using typedef name inside struct before it is defined (C)", options: ["In C, use struct Node* next inside struct, not Node*", "int data is wrong", "typedef is wrong", "next is wrong"], answer: 0, explanation: "In C, the typedef alias isn't visible inside its own struct. Use 'struct Node* next'." },
+      { code: `#include <stdio.h>\nint main() {\n    int a = 1;\n    switch(a) {\n        case 1: printf("one");\n        case 2: printf("two");\n        default: printf("other");\n    }\n}`, error: "Missing break causes fall-through", options: ["Without break, execution falls through all cases after match", "switch is wrong", "case syntax is wrong", "printf is wrong"], answer: 0, explanation: "Switch cases fall through without break. 'one', 'two', and 'other' would all print." },
+      { code: `#include <stdlib.h>\nint main() {\n    int* p = malloc(4);\n    p++;\n    free(p);\n}`, error: "Freeing modified pointer — invalid free", options: ["free() must receive original malloc'd pointer, not p+1", "malloc is wrong", "int* is wrong", "p++ is wrong"], answer: 0, explanation: "free() must be called with the exact pointer returned by malloc, not an offset of it." },
+      { code: `#include <string.h>\nint main() {\n    char dest[5];\n    strcpy(dest, "Hello World");\n}`, error: "strcpy buffer overflow", options: ["dest[5] can't hold 'Hello World' (11 chars + null)", "strcpy is wrong", "char dest is wrong", "Hello World needs quotes"], answer: 0, explanation: "strcpy doesn't check bounds. 'Hello World' is 12 bytes including null terminator, overflowing dest[5]." },
+      { code: `#include <stdio.h>\nvoid foo(int arr[]) {\n    int n = sizeof(arr) / sizeof(int);\n    printf("%d", n);\n}\nint main() { int a[5]; foo(a); }`, error: "sizeof on array parameter gives pointer size", options: ["Array decays to pointer in function param — sizeof gives pointer size", "int n is wrong", "sizeof is wrong", "printf is wrong"], answer: 0, explanation: "When an array is passed to a function, it decays to a pointer. sizeof(arr) gives the pointer's size, not the array's." },
+      { code: `#include <stdio.h>\nint main() {\n    volatile int x = 0;\n    int* p = (int*)&x;\n    *p = 5;\n    printf("%d", x);\n}`, error: "Casting away volatile is undefined behavior", options: ["Casting volatile int* to int* and modifying is undefined behavior", "volatile is wrong", "int* p is wrong", "printf is wrong"], answer: 0, explanation: "Casting away volatile qualifiers and then modifying the object is undefined behavior." },
     ],
   },
-  dsa: {
+
+  cpp: {
     easy: [
-      { code: `# Stack push\nstack = []\nstack.append(1)\nstack.append(2)\nprint(stack.pop(0))  # expected: 2`, error: "pop(0) removes from front (queue), not top (stack)", options: ["pop(0) is queue behavior — use pop() for stack (LIFO)", "append is wrong", "stack is wrong", "print is wrong"], answer: 0, explanation: "Stack is LIFO. pop() removes the last element. pop(0) removes the first, which is queue (FIFO) behavior." },
-      { code: `# Binary search\ndef bsearch(arr, target):\n    lo, hi = 0, len(arr)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target: return mid\n        elif arr[mid] < target: lo = mid + 1\n        else: hi = mid`, error: "hi = len(arr) causes index out of range", options: ["hi should be len(arr)-1 to avoid out-of-bounds access", "lo is wrong", "mid is wrong", "while is wrong"], answer: 0, explanation: "hi = len(arr) can cause arr[mid] to access index len(arr)-1+1 which is out of range. Use len(arr)-1." },
-      { code: `# Reverse a linked list\ndef reverse(head):\n    prev = None\n    curr = head\n    while curr:\n        curr.next = prev\n        prev = curr\n        curr = curr.next\n    return prev`, error: "curr.next lost before advancing curr", options: ["curr.next overwritten before saving — curr.next is always None after", "prev is wrong", "return is wrong", "while is wrong"], answer: 0, explanation: "After curr.next = prev, curr.next is None. curr = curr.next sets curr to None. Save next first: nxt = curr.next." },
-      { code: `# Count elements\ncount = {}\nfor item in arr:\n    count[item] += 1`, error: "KeyError on first occurrence", options: ["count[item] fails with KeyError if item not in dict yet", "for is wrong", "count is wrong", "arr is wrong"], answer: 0, explanation: "The first time an item appears, count[item] doesn't exist. Use count.get(item, 0) + 1 or defaultdict." },
-      { code: `# Check palindrome\ndef is_palindrome(s):\n    return s == s.reverse()`, error: "list.reverse() returns None", options: ["str has no .reverse() method — use s[::-1] instead", "def is wrong", "return is wrong", "s is wrong"], answer: 0, explanation: "Strings don't have a .reverse() method. Use s[::-1] to get the reversed string." },
-      { code: `# BFS\nfrom collections import deque\nvisited = []\nqueue = deque([start])\nwhile queue:\n    node = queue.popleft()\n    if node not in visited:\n        visited.append(node)`, error: "List for visited is O(n) lookup", options: ["Using list for visited is O(n) — use set for O(1) lookup", "deque is wrong", "popleft is wrong", "queue is wrong"], answer: 0, explanation: "'in' check on a list is O(n). Use a set for O(1) membership testing." },
-      { code: `# Fibonacci\ndef fib(n):\n    if n == 1: return 1\n    return fib(n-1) + fib(n-2)`, error: "Missing base case for n=0", options: ["fib(0) has no base case — recurses to negative infinity", "return is wrong", "def is wrong", "n is wrong"], answer: 0, explanation: "fib(0) calls fib(-1) + fib(-2), infinitely. Add: if n <= 1: return n." },
-      { code: `# Two sum\ndef two_sum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        complement = target - num\n        if complement in seen:\n            return [i, seen[complement]]\n        seen[num] = i`, error: "Returns [i, seen[complement]] — wrong order", options: ["Should return [seen[complement], i] — first index before second", "enumerate is wrong", "seen is wrong", "complement is wrong"], answer: 0, explanation: "seen[complement] is the earlier index. Return [seen[complement], i] to maintain order." },
-      { code: `# Merge sort merge step\ndef merge(left, right):\n    result = []\n    i = j = 0\n    while i < len(left) and j < len(right):\n        if left[i] < right[j]:\n            result.append(left[i])\n            i += 1\n        else:\n            result.append(right[j])\n            j += 1\n    return result`, error: "Remaining elements not appended", options: ["After while loop, remaining left or right elements not added to result", "while is wrong", "append is wrong", "merge is wrong"], answer: 0, explanation: "After the while loop, one side may still have elements. Add: return result + left[i:] + right[j:]." },
-      { code: `# Queue using two stacks\nclass Queue:\n    def __init__(self):\n        self.s1 = []\n        self.s2 = []\n    def enqueue(self, x):\n        self.s1.append(x)\n    def dequeue(self):\n        return self.s1.pop(0)`, error: "Using pop(0) defeats the purpose of two stacks", options: ["pop(0) is O(n) — should transfer s1 to s2 and pop from s2", "enqueue is wrong", "s1 is wrong", "append is wrong"], answer: 0, explanation: "The two-stack approach uses s2 as the dequeue stack. Transfer from s1 to s2 when s2 is empty, then s2.pop()." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    cout << "Hello" << endl\n    return 0;\n}`, error: "Missing semicolon after endl", options: ["Missing semicolon after cout statement", "cout is wrong", "endl is wrong", "return is wrong"], answer: 0, explanation: "Every statement in C++ must end with a semicolon." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int x = 10;\n    cout << x << endl;\n    return 0\n}`, error: "Missing semicolon after return 0", options: ["Missing semicolon after return 0", "int x is wrong", "cout is wrong", "endl is wrong"], answer: 0, explanation: "return 0 must be followed by a semicolon in C++." },
+      { code: `#include <iostream>\nusing namespace std;\nvoid greet() {\n    cout << "Hi!" << endl;\n}\nint main() {\n    greet;\n    return 0;\n}`, error: "Function not called — missing parentheses", options: ["greet should be greet() to invoke the function", "void is wrong", "cout is wrong", "return is wrong"], answer: 0, explanation: "'greet' without () is a function pointer, not a function call." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int arr[3] = {1, 2, 3};\n    cout << arr[3] << endl;\n    return 0;\n}`, error: "Array index out of bounds", options: ["Index 3 is out of bounds — valid indices are 0, 1, 2", "arr declaration is wrong", "cout is wrong", "endl is wrong"], answer: 0, explanation: "arr[3] has 3 elements at indices 0-2. Accessing index 3 is undefined behavior." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    string name;\n    cin >> name;\n    cout << "Hello " + name << endl;\n    return 0;\n}`, error: "Missing #include <string>", options: ["Need #include <string> to use std::string", "cin is wrong", "cout is wrong", "endl is wrong"], answer: 0, explanation: "std::string requires #include <string> in C++." },
+      { code: `#include <iostream>\nusing namespace std;\nclass Animal {\n    string name;\n    void speak() { cout << name; }\n};`, error: "Members are private by default in class", options: ["name and speak() are private by default in a class", "string is wrong", "cout is wrong", "void is wrong"], answer: 0, explanation: "In a C++ class, members are private by default. Use 'public:' to make them accessible." },
+      { code: `#include <iostream>\nusing namespace std;\nint square(int x) {\n    return x * x;\n}\nint main() {\n    cout << Square(5) << endl;\n}`, error: "Function name case mismatch", options: ["square and Square are different — C++ is case-sensitive", "int is wrong", "return is wrong", "cout is wrong"], answer: 0, explanation: "C++ is case-sensitive. The function is 'square' but called as 'Square'." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    const int x = 10;\n    x = 20;\n    cout << x << endl;\n}`, error: "Assigning to const variable", options: ["x is const and cannot be reassigned", "int is wrong", "cout is wrong", "const syntax is wrong"], answer: 0, explanation: "A const variable cannot be modified after initialization." },
+      { code: `#include <vector>\nusing namespace std;\nint main() {\n    vector<int> v = {1, 2, 3};\n    cout << v[5];\n}`, error: "Vector index out of bounds", options: ["v[5] is out of range — vector has only 3 elements", "vector is wrong", "cout is wrong", "int is wrong"], answer: 0, explanation: "Accessing v[5] on a vector of size 3 is undefined behavior." },
+      { code: `#include <iostream>\nusing namespace std;\nint divide(int a, int b) {\n    return a / b;\n}\nint main() {\n    cout << divide(10, 0);\n}`, error: "Division by zero", options: ["Calling divide(10, 0) causes integer division by zero", "int is wrong", "return is wrong", "cout is wrong"], answer: 0, explanation: "Integer division by zero is undefined behavior in C++." },
     ],
     medium: [
-      { code: `# DFS iterative\ndef dfs(graph, start):\n    stack = [start]\n    visited = set()\n    while stack:\n        node = stack.pop()\n        visited.add(node)\n        for neighbor in graph[node]:\n            stack.append(neighbor)`, error: "Appending already-visited neighbors", options: ["Should check 'if neighbor not in visited' before appending", "stack is wrong", "pop is wrong", "visited is wrong"], answer: 0, explanation: "Without checking visited before appending, nodes get processed multiple times in cyclic graphs." },
-      { code: `# Dijkstra\nimport heapq\ndef dijkstra(graph, start):\n    dist = {start: 0}\n    heap = [(0, start)]\n    while heap:\n        d, u = heapq.heappop(heap)\n        for v, w in graph[u]:\n            if dist[u] + w < dist[v]:\n                dist[v] = dist[u] + w\n                heapq.heappush(heap, (dist[v], v))`, error: "KeyError if v not in dist", options: ["dist[v] raises KeyError if v hasn't been seen yet — use dist.get(v, inf)", "heappop is wrong", "heappush is wrong", "while is wrong"], answer: 0, explanation: "dist[v] throws KeyError if v is new. Initialize dist with float('inf') for all nodes or use dist.get(v, inf)." },
-      { code: `# Detect cycle in linked list\ndef has_cycle(head):\n    slow = fast = head\n    while fast and fast.next:\n        slow = slow.next\n        fast = fast.next\n        if slow == fast: return True\n    return False`, error: "Fast pointer advances only once", options: ["fast should advance twice (fast = fast.next.next) to detect cycle", "slow is wrong", "while is wrong", "return is wrong"], answer: 0, explanation: "Floyd's algorithm requires fast to move 2 steps: fast = fast.next.next. Moving once makes it same speed as slow." },
-      { code: `# Quick sort\ndef quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[0]\n    left = [x for x in arr if x < pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + [pivot] + quicksort(right)`, error: "Duplicate elements lost", options: ["Elements equal to pivot are dropped — duplicates lost", "pivot is wrong", "return is wrong", "len is wrong"], answer: 0, explanation: "Elements equal to pivot are excluded from both left and right. Use x <= pivot for left or collect equals separately." },
-      { code: `# Topological sort\nfrom collections import deque\ndef topo(graph):\n    in_deg = {v: 0 for v in graph}\n    for v in graph:\n        for u in graph[v]:\n            in_deg[u] += 1\n    q = deque([v for v in in_deg if in_deg[v] == 0])\n    order = []\n    while q:\n        v = q.popleft()\n        order.append(v)\n        for u in graph[v]:\n            in_deg[u] -= 1\n            if in_deg[u] == 0:\n                q.append(u)\n    return order`, error: "No cycle detection", options: ["If graph has cycle, order won't contain all nodes — should check len(order)", "deque is wrong", "popleft is wrong", "in_deg is wrong"], answer: 0, explanation: "For a graph with a cycle, some nodes won't be added. Check if len(order) == len(graph) to detect cycles." },
-      { code: `# Sliding window\ndef max_sum(arr, k):\n    window_sum = sum(arr[:k])\n    max_sum = window_sum\n    for i in range(k, len(arr)):\n        window_sum += arr[i] - arr[i-k]\n        max_sum = max(max_sum, window_sum)\n    return max_sum`, error: "No check for k > len(arr)", options: ["If k > len(arr), sum(arr[:k]) and loop are invalid", "sum is wrong", "range is wrong", "max is wrong"], answer: 0, explanation: "If k > len(arr), the initial window is invalid. Add a guard: if k > len(arr): return 0 or raise an error." },
-      { code: `# Memoized fibonacci\nmemo = {}\ndef fib(n):\n    if n in memo: return memo[n]\n    if n <= 1: return n\n    memo[n] = fib(n-1) + fib(n-2)\n    return memo[n]`, error: "Global memo shared across calls — may have stale values", options: ["Global memo persists between test calls — can cause wrong results", "def is wrong", "return is wrong", "memo is wrong"], answer: 0, explanation: "Using a global memo dict means previous test runs pollute the cache. Use functools.lru_cache or pass memo as param." },
-      { code: `# Union Find\nparent = list(range(n))\ndef find(x):\n    while parent[x] != x:\n        x = parent[x]\n    return x\ndef union(a, b):\n    parent[find(a)] = find(b)`, error: "No path compression or union by rank", options: ["Without path compression, find is O(n) in worst case", "while is wrong", "parent is wrong", "union is wrong"], answer: 0, explanation: "This is correct but inefficient. Without path compression, find() degrades to O(n). Add parent[x] = parent[parent[x]] in find." },
-      { code: `# LRU Cache\nfrom collections import OrderedDict\nclass LRU:\n    def __init__(self, cap):\n        self.cap = cap\n        self.cache = OrderedDict()\n    def get(self, key):\n        if key not in self.cache: return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n    def put(self, key, val):\n        self.cache[key] = val\n        if len(self.cache) > self.cap:\n            self.cache.popitem(last=False)`, error: "put doesn't move existing key to end", options: ["Existing key not moved to end on put — breaks LRU order", "OrderedDict is wrong", "popitem is wrong", "get is wrong"], answer: 0, explanation: "When putting an existing key, it should be moved to end (most recent). Add: self.cache.move_to_end(key) in put." },
-      { code: `# Binary tree height\ndef height(root):\n    if root is None: return 0\n    return 1 + max(height(root.left), height(root.right))`, error: "Correct but returns height not depth", options: ["This computes height correctly but variable naming may be confused with depth", "max is wrong", "return is wrong", "root is wrong"], answer: 0, explanation: "Actually this is correct. Height = number of edges from root to deepest leaf. This returns nodes count. Conceptually fine but off-by-one vs edge-based definition." },
+      { code: `#include <iostream>\nusing namespace std;\nclass MyClass {\npublic:\n    int* data;\n    MyClass() { data = new int(5); }\n};\nint main() {\n    MyClass a;\n    MyClass b = a;\n}`, error: "Shallow copy — two objects share same pointer", options: ["Default copy constructor copies pointer, not data — double delete risk", "new int is wrong", "MyClass() is wrong", "int* is wrong"], answer: 0, explanation: "The default copy constructor does a shallow copy, so a.data and b.data point to the same memory." },
+      { code: `#include <iostream>\nusing namespace std;\nvoid process(vector<int> v) {\n    v.push_back(99);\n}\nint main() {\n    vector<int> nums = {1, 2, 3};\n    process(nums);\n    cout << nums.size();\n}`, error: "Vector passed by value — original not modified", options: ["process() receives a copy of nums, so push_back doesn't affect original", "push_back is wrong", "cout is wrong", "vector is wrong"], answer: 0, explanation: "Vectors are passed by value. Changes inside process() don't affect the original. Use & parameter." },
+      { code: `class Base {\npublic:\n    void show() { cout << "Base"; }\n};\nclass Derived : public Base {\npublic:\n    void show() { cout << "Derived"; }\n};\nBase* b = new Derived();\nb->show();`, error: "Non-virtual method — Base version called", options: ["show() is not virtual, so Base::show() is called even for Derived object", "public is wrong", "new is wrong", "cout is wrong"], answer: 0, explanation: "Without 'virtual', method resolution is static. b->show() calls Base::show()." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int* p = new int(10);\n    delete p;\n    delete p;\n}`, error: "Double delete — undefined behavior", options: ["Calling delete twice on same pointer is undefined behavior", "new int is wrong", "int* is wrong", "delete syntax is wrong"], answer: 0, explanation: "Double deleting a pointer is undefined behavior and can crash the program." },
+      { code: `#include <iostream>\nusing namespace std;\nstring& getStr() {\n    string s = "hello";\n    return s;\n}\nint main() {\n    string& r = getStr();\n    cout << r;\n}`, error: "Returning reference to local variable", options: ["s is destroyed when getStr() returns — dangling reference", "string is wrong", "return is wrong", "cout is wrong"], answer: 0, explanation: "Returning a reference to a local variable creates a dangling reference after the function ends." },
+      { code: `#include <iostream>\nusing namespace std;\ntemplate<typename T>\nvoid print(T val) { cout << val; }\nint main() {\n    print<>(42);\n}`, error: "Empty template argument list", options: ["print<> should be print or print<int> — empty <> is invalid here", "template is wrong", "cout is wrong", "typename is wrong"], answer: 0, explanation: "print<> with empty angle brackets is a syntax error. Use print(42) or print<int>(42)." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int x = 5;\n    int& ref = x;\n    ref = 10;\n    int& ref2 = ref;\n    ref2 = 20;\n    cout << x;\n}`, error: "Logic confusion — ref2 rebinds, not creates new ref", options: ["int& ref2 = ref makes ref2 an alias to x; x becomes 20", "ref = 10 is wrong", "cout is wrong", "int& is wrong"], answer: 0, explanation: "References cannot be rebound. ref2 refers to x, so x becomes 20. This compiles but the logic may confuse." },
+      { code: `struct Point { int x, y; };\nbool cmp(Point a, Point b) {\n    return a.x < b.x;\n    return a.y < b.y;\n}`, error: "Dead code — second return unreachable", options: ["Second return a.y < b.y is unreachable after first return", "struct is wrong", "bool is wrong", "return syntax is wrong"], answer: 0, explanation: "After 'return a.x < b.x', the second return is dead code and never executes." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    auto lambda = [](int x) { return x * 2; };\n    cout << lambda[3];\n}`, error: "Lambda called with [] instead of ()", options: ["Lambdas are called with () not [] — lambda(3) is correct", "auto is wrong", "return is wrong", "cout is wrong"], answer: 0, explanation: "Lambdas are invoked with parentheses: lambda(3). Using [] tries to subscript the lambda object." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    for (int i = 0; i < 10; i++);\n    {\n        cout << i << endl;\n    }\n}`, error: "Semicolon ends for loop — empty body", options: ["Semicolon after for() creates an empty loop; block below is unrelated", "int i = 0 is wrong", "cout is wrong", "endl is wrong"], answer: 0, explanation: "The semicolon after for(...); terminates the loop with an empty body. The block runs once after the loop." },
     ],
     hard: [
-      { code: `# Dijkstra with negative weights\nimport heapq\ndef dijkstra(graph, start):\n    dist = {start: 0}\n    heap = [(0, start)]\n    while heap:\n        d, u = heapq.heappop(heap)\n        for v, w in graph[u]:\n            if d + w < dist.get(v, float('inf')):\n                dist[v] = d + w\n                heapq.heappush(heap, (dist[v], v))\n    return dist`, error: "Dijkstra doesn't work with negative weights", options: ["Dijkstra assumes non-negative weights — use Bellman-Ford for negatives", "heapq is wrong", "dist is wrong", "heappop is wrong"], answer: 0, explanation: "Dijkstra's greedy approach fails with negative weights. Use Bellman-Ford for graphs with negative edges." },
-      { code: `# Trie insert\nclass Trie:\n    def __init__(self):\n        self.children = {}\n        self.is_end = False\n    def insert(self, word):\n        node = self\n        for ch in word:\n            node = node.children[ch]\n        node.is_end = True`, error: "Missing setdefault or creation of new nodes", options: ["node.children[ch] raises KeyError if ch not in children", "insert is wrong", "is_end is wrong", "for is wrong"], answer: 0, explanation: "children[ch] fails if ch doesn't exist. Use node.children.setdefault(ch, Trie()) or check and create." },
-      { code: `# Floyd-Warshall\nn = len(graph)\ndist = graph[:]\nfor k in range(n):\n    for i in range(n):\n        for j in range(n):\n            dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])`, error: "Shallow copy of graph", options: ["graph[:] is shallow copy — modifying dist also modifies graph", "min is wrong", "range is wrong", "dist is wrong"], answer: 0, explanation: "graph[:] copies the outer list but not inner lists. Use copy.deepcopy(graph) for true independence." },
-      { code: `# Heap sort\ndef heapify(arr, n, i):\n    largest = i\n    l, r = 2*i+1, 2*i+2\n    if l < n and arr[l] > arr[largest]: largest = l\n    if r < n and arr[r] > arr[largest]: largest = r\n    if largest != i:\n        arr[i], arr[largest] = arr[largest], arr[i]\ndef heap_sort(arr):\n    n = len(arr)\n    for i in range(n//2-1, -1, -1):\n        heapify(arr, n, i)\n    for i in range(n-1, 0, -1):\n        arr[0], arr[i] = arr[i], arr[0]`, error: "Missing heapify call after each swap in extraction phase", options: ["After swapping arr[0] and arr[i], heapify(arr, i, 0) is never called", "heapify is wrong", "range is wrong", "arr is wrong"], answer: 0, explanation: "After extracting the max to position i, the heap property must be restored by calling heapify(arr, i, 0)." },
-      { code: `# Detect negative cycle (Bellman-Ford)\ndef has_negative_cycle(graph, n):\n    dist = [float('inf')] * n\n    dist[0] = 0\n    for _ in range(n-1):\n        for u, v, w in graph:\n            if dist[u] + w < dist[v]:\n                dist[v] = dist[u] + w\n    return any(dist[u] + w < dist[v] for u, v, w in graph)`, error: "Only checks reachable nodes from node 0", options: ["Negative cycles unreachable from node 0 are not detected", "range is wrong", "dist is wrong", "any is wrong"], answer: 0, explanation: "Starting from node 0 misses isolated negative cycles. To detect all, initialize all dist[i] = 0 (virtual source)." },
-      { code: `# A* search\ndef astar(start, goal, h):\n    open_set = [(h(start), start)]\n    g = {start: 0}\n    while open_set:\n        _, curr = heapq.heappop(open_set)\n        if curr == goal: return g[goal]\n        for nb, cost in neighbors(curr):\n            new_g = g[curr] + cost\n            if new_g < g.get(nb, inf):\n                g[nb] = new_g\n                heapq.heappush(open_set, (new_g + h(nb), nb))`, error: "No closed set — may re-expand nodes", options: ["Without a closed/visited set, nodes can be re-expanded multiple times", "heappop is wrong", "heappush is wrong", "g is wrong"], answer: 0, explanation: "A* needs a closed set to avoid re-processing already-settled nodes, which can cause incorrect results or slowness." },
-      { code: `# Segment tree update\ndef update(tree, i, val, node=1, lo=0, hi=None):\n    if hi is None: hi = len(tree) - 1\n    if lo == hi:\n        tree[node] = val\n        return\n    mid = (lo + hi) // 2\n    if i <= mid: update(tree, i, val, 2*node, lo, mid)\n    else: update(tree, i, val, 2*node+1, mid+1, hi)\n    tree[node] = tree[2*node] + tree[2*node+1]`, error: "hi based on tree size not array size", options: ["hi should be based on original array size, not tree array size", "update is wrong", "mid is wrong", "tree is wrong"], answer: 0, explanation: "Segment tree array is ~4x the original. hi = len(tree)-1 is wrong. Pass the original array size separately." },
-      { code: `# KMP search\ndef kmp(text, pattern):\n    lps = [0] * len(pattern)\n    i = j = 0\n    while i < len(text):\n        if text[i] == pattern[j]:\n            i += 1; j += 1\n        if j == len(pattern):\n            print(i - j)\n            j = lps[j-1]\n        elif i < len(text) and text[i] != pattern[j]:\n            if j != 0: j = lps[j-1]\n            else: i += 1`, error: "elif runs even after match found", options: ["After match, elif may incorrectly handle mismatch in same iteration", "while is wrong", "lps is wrong", "print is wrong"], answer: 0, explanation: "After j == len(pattern), the elif runs in the same iteration if i < len(text). Use else instead of elif." },
-      { code: `# Manacher's algorithm\ndef manacher(s):\n    t = '#'.join('^{}$'.format(s))\n    n = len(t)\n    p = [0] * n\n    c = r = 0\n    for i in range(1, n-1):\n        mirror = 2*c - i\n        if i < r:\n            p[i] = min(r-i, p[mirror])\n        while t[i+p[i]+1] == t[i-p[i]-1]:\n            p[i] += 1\n        if i+p[i] > r:\n            c, r = i, i+p[i]\n    return max(p)`, error: "Sentinel characters may cause index issues", options: ["'^' and '$' sentinels prevent out-of-bounds but format string is tricky", "manacher is wrong", "mirror is wrong", "while is wrong"], answer: 0, explanation: "The format '^#{}$'.format('#'.join(s)) is slightly off. The correct transform is '^#' + '#'.join(s) + '#$'." },
-      { code: `# Convex hull (Graham scan)\npoints.sort(key=lambda p: (p[0], p[1]))\n# cross product\ndef cross(O, A, B):\n    return (A[0]-O[0])*(B[1]-O[1]) - (A[1]-O[1])*(B[0]-O[0])\nhull = []\nfor p in points:\n    while len(hull) >= 2 and cross(hull[-2], hull[-1], p) >= 0:\n        hull.pop()\n    hull.append(p)`, error: "Builds only lower hull — upper hull missing", options: ["Graham scan needs both lower and upper hull passes to complete convex hull", "cross is wrong", "sort is wrong", "while is wrong"], answer: 0, explanation: "This code only builds the lower hull. A complete convex hull requires iterating points in both directions." },
+      { code: `#include <iostream>\nusing namespace std;\nclass A {\npublic:\n    ~A() { cout << "A destroyed"; }\n};\nclass B : public A {\npublic:\n    ~B() { cout << "B destroyed"; }\n};\nA* obj = new B();\ndelete obj;`, error: "Non-virtual destructor causes incomplete cleanup", options: ["A's destructor is not virtual — only ~A() called, ~B() skipped", "delete is wrong", "new B() is wrong", "cout is wrong"], answer: 0, explanation: "Without virtual destructor in base class, deleting a derived object through base pointer only calls ~A()." },
+      { code: `#include <memory>\nusing namespace std;\nstruct Node {\n    shared_ptr<Node> next;\n    shared_ptr<Node> prev;\n};\nint main() {\n    auto a = make_shared<Node>();\n    auto b = make_shared<Node>();\n    a->next = b;\n    b->prev = a;\n}`, error: "Circular shared_ptr reference — memory leak", options: ["Circular shared_ptr keeps ref count > 0 forever — memory never freed", "make_shared is wrong", "struct is wrong", "auto is wrong"], answer: 0, explanation: "Circular references with shared_ptr prevent ref count from reaching 0. Use weak_ptr for back-references." },
+      { code: `#include <iostream>\nusing namespace std;\ntemplate<typename T>\nT add(T a, T b) { return a + b; }\nint main() {\n    cout << add(1, 2.5);\n}`, error: "Template deduction conflict", options: ["add(1, 2.5) deduces T as int and double — conflict, won't compile", "template is wrong", "cout is wrong", "return is wrong"], answer: 0, explanation: "Template type deduction requires consistent types. int and double conflict for T." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int x = 10;\n    auto f = [x]() mutable { x = 20; };\n    f();\n    cout << x;\n}`, error: "Lambda captures by value — original x unchanged", options: ["[x] captures a copy of x; modifying it doesn't change outer x", "auto is wrong", "mutable is wrong", "cout is wrong"], answer: 0, explanation: "Capture by value ([x]) copies x. Even with mutable, changes stay inside the lambda." },
+      { code: `#include <iostream>\nusing namespace std;\nstruct S {\n    S() { cout << "ctor"; }\n    S(const S&) { cout << "copy"; }\n};\nvoid take(S s) {}\nint main() {\n    S obj;\n    take(obj);\n}`, error: "Unnecessary copy — should pass by const ref", options: ["take(S s) copies obj on every call — prefer take(const S& s)", "struct is wrong", "cout is wrong", "void is wrong"], answer: 0, explanation: "Passing by value triggers a copy constructor call. Use const S& to avoid the copy." },
+      { code: `#include <iostream>\nusing namespace std;\nclass Singleton {\n    static Singleton* instance;\npublic:\n    static Singleton* get() {\n        if (!instance) instance = new Singleton();\n        return instance;\n    }\n};\nSingleton* Singleton::instance;`, error: "Not thread-safe singleton", options: ["Two threads can both see !instance as true and create two instances", "static is wrong", "new is wrong", "if is wrong"], answer: 0, explanation: "Without a mutex, two threads can simultaneously pass the null check and create two Singleton instances." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    const char* a = "foo";\n    const char* b = "foo";\n    if (a == b) cout << "equal";\n    else cout << "not equal";\n}`, error: "Comparing string literals by pointer not content", options: ["a == b compares pointers, not content — use strcmp or std::string", "const char* is wrong", "cout is wrong", "if is wrong"], answer: 0, explanation: "Pointer comparison checks addresses, not string content. Use strcmp(a,b)==0 or std::string." },
+      { code: `#include <iostream>\nusing namespace std;\nvoid f(int& x) { x++; }\nint main() {\n    f(5);\n    cout << "done";\n}`, error: "Passing rvalue to non-const reference", options: ["5 is an rvalue — cannot bind to int& (non-const lvalue reference)", "void is wrong", "cout is wrong", "x++ is wrong"], answer: 0, explanation: "Non-const lvalue references cannot bind to rvalues like literals. Use int&&, const int&, or a variable." },
+      { code: `#include <vector>\nusing namespace std;\nint main() {\n    vector<int> v = {1,2,3};\n    for (auto it = v.begin(); it != v.end(); ++it) {\n        if (*it == 2) v.erase(it);\n    }\n}`, error: "Iterator invalidated after erase", options: ["v.erase() invalidates it — accessing it++ is undefined behavior", "auto is wrong", "erase is wrong", "for loop is wrong"], answer: 0, explanation: "Erasing from a vector invalidates all iterators at and after the erased position." },
+      { code: `#include <iostream>\nusing namespace std;\nint main() {\n    int arr[] = {1, 2, 3};\n    int* p = arr;\n    cout << *(p + 5);\n}`, error: "Pointer arithmetic out of bounds", options: ["p + 5 points past the 3-element array — undefined behavior", "int* is wrong", "cout is wrong", "arr declaration is wrong"], answer: 0, explanation: "Accessing memory beyond the array's bounds through pointer arithmetic is undefined behavior." },
+    ],
+  },
+
+  java: {
+    easy: [
+      { code: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello")\n    }\n}`, error: "Missing semicolon", options: ["Missing semicolon after println statement", "println is wrong", "String[] is wrong", "public is wrong"], answer: 0, explanation: "Every statement in Java must end with a semicolon." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        int x = 10;\n        if (x > 5)\n        System.out.println("big");\n    }\n}`, error: "Missing braces (logic error for multi-line)", options: ["Without braces, only one line is inside if — code is misleading", "int is wrong", "println is wrong", "x > 5 is wrong"], answer: 0, explanation: "Without curly braces, only the next statement belongs to the if block." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        String name = null;\n        System.out.println(name.length());\n    }\n}`, error: "NullPointerException", options: ["name is null — calling .length() throws NullPointerException", "String is wrong", "println is wrong", "null is wrong"], answer: 0, explanation: "Calling a method on a null reference throws a NullPointerException." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        int[] arr = new int[3];\n        System.out.println(arr[3]);\n    }\n}`, error: "ArrayIndexOutOfBoundsException", options: ["Index 3 is out of bounds for array of length 3", "new int[3] is wrong", "println is wrong", "int[] is wrong"], answer: 0, explanation: "Array indices run 0 to 2 for length-3 array. Accessing index 3 throws ArrayIndexOutOfBoundsException." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        String s1 = "Hello";\n        String s2 = "Hello";\n        if (s1 == s2)\n            System.out.println("equal");\n    }\n}`, error: "Using == to compare Strings", options: ["== compares references not content — use .equals() for Strings", "String is wrong", "println is wrong", "if is wrong"], answer: 0, explanation: "== checks reference equality. Use s1.equals(s2) to compare String content." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        int result = 10 / 3;\n        System.out.println(result);\n    }\n}`, error: "Integer division truncates decimal", options: ["10/3 gives 3 (truncated) not 3.33 — use double for decimal result", "int is wrong", "println is wrong", "/ operator is wrong"], answer: 0, explanation: "Integer division truncates the result. Use double result = 10.0 / 3 to get 3.33." },
+      { code: `public class Main {\n    static int count;\n    public static void main(String[] args) {\n        Main obj = new Main();\n        obj.count = 5;\n        Main obj2 = new Main();\n        System.out.println(obj2.count);\n    }\n}`, error: "Static field shared across all instances", options: ["count is static — all instances share it, obj2.count is 5 too", "static is wrong", "int is wrong", "println is wrong"], answer: 0, explanation: "Static fields are shared across all instances. obj2.count is 5 because count is static." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        for (int i = 0; i < 5; i++) {\n            System.out.println(i);\n        }\n        System.out.println(i);\n    }\n}`, error: "Variable i out of scope outside for loop", options: ["i is declared inside for — not accessible outside the loop", "for loop is wrong", "println is wrong", "int i is wrong"], answer: 0, explanation: "Variable i is scoped to the for loop. It cannot be accessed outside." },
+      { code: `public class Animal {\n    void speak() { System.out.println("..."); }\n}\npublic class Dog extends Animal {\n    void Speak() { System.out.println("Woof"); }\n}`, error: "Method not overridden — wrong case", options: ["Dog has Speak() not speak() — doesn't override Animal's speak()", "extends is wrong", "void is wrong", "println is wrong"], answer: 0, explanation: "Java is case-sensitive. Speak() != speak() — the method is not overridden." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        Integer a = 200;\n        Integer b = 200;\n        System.out.println(a == b);\n    }\n}`, error: "Integer cache miss — == returns false", options: ["Integer == compares references; cache only covers -128 to 127", "Integer is wrong", "println is wrong", "= 200 is wrong"], answer: 0, explanation: "Java caches Integer values -128 to 127. For 200, a and b are different objects, so == is false." },
+    ],
+    medium: [
+      { code: `import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> list = new ArrayList<>();\n        list.add(1); list.add(2); list.add(3);\n        for (Integer i : list) {\n            if (i == 2) list.remove(i);\n        }\n    }\n}`, error: "ConcurrentModificationException", options: ["Modifying list while iterating throws ConcurrentModificationException", "ArrayList is wrong", "remove is wrong", "for-each is wrong"], answer: 0, explanation: "You can't modify a list while iterating with for-each. Use Iterator.remove() or removeIf()." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        try {\n            int x = Integer.parseInt("abc");\n        } catch (Exception e) {\n        }\n        System.out.println(x);\n    }\n}`, error: "Variable x out of scope outside try block", options: ["x is declared inside try — not visible outside it", "parseInt is wrong", "catch is wrong", "println is wrong"], answer: 0, explanation: "Variables declared inside a try block are not accessible outside of it." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        Thread t = new Thread(() -> {\n            for (int i = 0; i < 5; i++)\n                System.out.println(i);\n        });\n        t.run();\n    }\n}`, error: "t.run() called instead of t.start()", options: ["t.run() executes in current thread — use t.start() for new thread", "Thread is wrong", "lambda is wrong", "println is wrong"], answer: 0, explanation: "t.run() calls the runnable directly in the current thread. t.start() creates a new thread." },
+      { code: `import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Map<String, Integer> map = new HashMap<>();\n        map.put(\"a\", 1);\n        int val = map.get(\"b\");\n    }\n}`, error: "NullPointerException from unboxing null", options: ["map.get('b') returns null, unboxing to int throws NullPointerException", "HashMap is wrong", "put is wrong", "int val is wrong"], answer: 0, explanation: "map.get(\"b\") returns null (key doesn't exist). Auto-unboxing null to int throws NullPointerException." },
+      { code: `public class Main {\n    static int[] data = new int[10];\n    public static void main(String[] args) {\n        System.out.println(data[10]);\n    }\n}`, error: "ArrayIndexOutOfBoundsException at index 10", options: ["Array length is 10, valid indices 0-9; data[10] is out of bounds", "static is wrong", "int[] is wrong", "println is wrong"], answer: 0, explanation: "new int[10] creates indices 0-9. data[10] throws ArrayIndexOutOfBoundsException." },
+      { code: `public class Main {\n    int value;\n    public Main(int v) { this.value = v; }\n    public boolean equals(Main other) {\n        return this.value == other.value;\n    }\n}`, error: "equals() not properly overridden", options: ["equals(Main) doesn't override Object.equals(Object) — wrong signature", "int value is wrong", "this.value is wrong", "boolean is wrong"], answer: 0, explanation: "To override Object.equals(), the parameter must be Object, not Main." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        String s = \"\";\n        for (int i = 0; i < 10000; i++) {\n            s += i;\n        }\n        System.out.println(s.length());\n    }\n}`, error: "String concatenation in loop is inefficient", options: ["+= creates new String object each iteration — use StringBuilder", "String is wrong", "for loop is wrong", "println is wrong"], answer: 0, explanation: "String is immutable. s += i creates a new String object 10000 times. Use StringBuilder.append()." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        Object obj = \"hello\";\n        Integer num = (Integer) obj;\n    }\n}`, error: "ClassCastException — String cast to Integer", options: ["obj holds a String, casting to Integer throws ClassCastException", "Object is wrong", "Integer is wrong", "cast syntax is wrong"], answer: 0, explanation: "obj actually references a String. Casting it to Integer throws ClassCastException at runtime." },
+      { code: `public class Main {\n    public static void main(String[] args) throws Exception {\n        int[] arr = {1, 2, 3};\n        int sum = 0;\n        for (int i = 0; i <= arr.length; i++) {\n            sum += arr[i];\n        }\n        System.out.println(sum);\n    }\n}`, error: "Off-by-one — i <= arr.length", options: ["i <= arr.length includes index 3, causing ArrayIndexOutOfBoundsException", "int sum is wrong", "for is wrong", "println is wrong"], answer: 0, explanation: "Loop condition should be i < arr.length. i <= arr.length accesses arr[3] which doesn't exist." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        final List<Integer> list = new ArrayList<>();\n        list = new ArrayList<>();\n    }\n}`, error: "Reassigning final variable", options: ["list is final — it cannot be reassigned to a new object", "ArrayList is wrong", "final is wrong", "List is wrong"], answer: 0, explanation: "final prevents reassignment. You can still modify the list's contents, but not assign a new list to list." },
+    ],
+    hard: [
+      { code: `public class Main {\n    private static Main instance;\n    public static Main getInstance() {\n        if (instance == null) {\n            instance = new Main();\n        }\n        return instance;\n    }\n}`, error: "Non-thread-safe singleton", options: ["Two threads can both see null and create two instances simultaneously", "static is wrong", "if is wrong", "private is wrong"], answer: 0, explanation: "Without synchronization, two threads can simultaneously create instances. Use synchronized or double-checked locking." },
+      { code: `import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        List list = new ArrayList();\n        list.add(\"hello\");\n        list.add(42);\n        String s = (String) list.get(1);\n    }\n}`, error: "Raw type — ClassCastException at runtime", options: ["list.get(1) returns 42 (Integer), casting to String throws ClassCastException", "ArrayList is wrong", "add is wrong", "String is wrong"], answer: 0, explanation: "Using raw types loses type safety. list.get(1) is an Integer, not a String." },
+      { code: `public class Main {\n    int x = 0;\n    void increment() { x++; }\n    public static void main(String[] args) throws Exception {\n        Main obj = new Main();\n        for (int i = 0; i < 1000; i++) {\n            new Thread(obj::increment).start();\n        }\n        Thread.sleep(1000);\n        System.out.println(obj.x);\n    }\n}`, error: "Race condition on x", options: ["x++ is not atomic — concurrent threads may produce wrong count", "Thread is wrong", "sleep is wrong", "int x is wrong"], answer: 0, explanation: "x++ is read-modify-write and not atomic. Multiple threads can overwrite each other's increments." },
+      { code: `import java.util.function.*;\npublic class Main {\n    static Supplier<Integer> makeCounter() {\n        int count = 0;\n        return () -> count++;\n    }\n}`, error: "Cannot modify captured local variable in lambda", options: ["Local variables captured by lambdas must be effectively final — count++ violates this", "Supplier is wrong", "int count is wrong", "return is wrong"], answer: 0, explanation: "Java lambdas can only capture effectively final variables. count++ modifies it, causing a compile error." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        try {\n            throw new RuntimeException(\"error\");\n        } finally {\n            return;\n        }\n    }\n}`, error: "return in finally swallows exception", options: ["return in finally discards the RuntimeException silently", "throw is wrong", "finally is wrong", "return is wrong"], answer: 0, explanation: "A return statement in finally overrides any exception being propagated, silently swallowing it." },
+      { code: `import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Map<List<Integer>, String> map = new HashMap<>();\n        List<Integer> key = new ArrayList<>(Arrays.asList(1, 2));\n        map.put(key, \"value\");\n        key.add(3);\n        System.out.println(map.get(key));\n    }\n}`, error: "Mutable key in HashMap — get returns null", options: ["Mutating the key after put changes its hashCode — map.get returns null", "HashMap is wrong", "ArrayList is wrong", "put is wrong"], answer: 0, explanation: "Modifying a HashMap key after insertion changes its hashCode, so map.get() can't find it." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        String result = null;\n        result += \"hello\";\n        System.out.println(result);\n    }\n}`, error: "null + string gives 'nullhello'", options: ["null concatenated with String gives 'nullhello', not 'hello'", "String is wrong", "println is wrong", "+= is wrong"], answer: 0, explanation: "null + \"hello\" produces the string \"nullhello\" because null is converted to the string \"null\"." },
+      { code: `import java.util.stream.*;\npublic class Main {\n    public static void main(String[] args) {\n        Stream<Integer> s = Stream.of(1,2,3);\n        s.forEach(System.out::println);\n        s.forEach(System.out::println);\n    }\n}`, error: "Stream already consumed", options: ["Stream cannot be reused — second forEach throws IllegalStateException", "Stream.of is wrong", "forEach is wrong", "println is wrong"], answer: 0, explanation: "Streams can only be consumed once. Calling forEach a second time throws IllegalStateException." },
+      { code: `public enum Day { MON, TUE, WED }\npublic class Main {\n    public static void main(String[] args) {\n        Day d = Day.valueOf(\"mon\");\n    }\n}`, error: "valueOf is case-sensitive — throws IllegalArgumentException", options: ["Day.valueOf('mon') fails — enum constants are 'MON', uppercase required", "enum is wrong", "Day is wrong", "String is wrong"], answer: 0, explanation: "Enum.valueOf() is case-sensitive. 'mon' doesn't match 'MON', throwing IllegalArgumentException." },
+      { code: `public class Main {\n    public static void main(String[] args) {\n        int[] arr = {3, 1, 4, 1, 5};\n        Arrays.sort(arr);\n        System.out.println(Arrays.binarySearch(arr, 6));\n    }\n}`, error: "binarySearch returns negative for missing element", options: ["6 not in array — binarySearch returns negative insertion point, not -1", "Arrays.sort is wrong", "println is wrong", "int[] is wrong"], answer: 0, explanation: "binarySearch returns -(insertion point) - 1 when element is not found, not necessarily -1." },
+    ],
+  },
+
+  sql: {
+    easy: [
+      { code: `SELECT name age FROM employees;`, error: "Missing comma between column names", options: ["Missing comma between name and age", "SELECT is wrong", "FROM is wrong", "employees is wrong"], answer: 0, explanation: "Column names in SELECT must be separated by commas." },
+      { code: `SELECT * FROM employees\nWHERE salary > 50000\nORDER name;`, error: "Missing BY in ORDER clause", options: ["Should be ORDER BY name, not just ORDER name", "WHERE is wrong", "SELECT * is wrong", "salary > 50000 is wrong"], answer: 0, explanation: "The ORDER clause requires the BY keyword: ORDER BY name." },
+      { code: `SELECT * FROM employees\nWHERE name = Alice;`, error: "String value not quoted", options: ["String values must be in quotes: WHERE name = 'Alice'", "WHERE is wrong", "= is wrong", "SELECT * is wrong"], answer: 0, explanation: "String literals in SQL must be enclosed in single quotes." },
+      { code: `SELECT COUNT(*)\nFROM employees\nGROUP BY department\nWHERE salary > 50000;`, error: "WHERE after GROUP BY is invalid", options: ["WHERE must come before GROUP BY; use HAVING for post-group filters", "COUNT(*) is wrong", "GROUP BY is wrong", "SELECT is wrong"], answer: 0, explanation: "WHERE filters rows before grouping. It must come before GROUP BY. Use HAVING to filter groups." },
+      { code: `SELECT name, MAX(salary)\nFROM employees;`, error: "Mixing aggregate with non-aggregate without GROUP BY", options: ["name must appear in GROUP BY when used with MAX()", "MAX is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "When using aggregate functions, non-aggregated columns must be in GROUP BY." },
+      { code: `UPDATE employees\nSET salary = 60000;`, error: "Missing WHERE clause — updates all rows", options: ["No WHERE clause — this updates every employee's salary", "UPDATE is wrong", "SET is wrong", "salary is wrong"], answer: 0, explanation: "Without WHERE, UPDATE modifies all rows in the table." },
+      { code: `DELETE employees\nWHERE id = 5;`, error: "Missing FROM keyword in DELETE", options: ["Syntax should be DELETE FROM employees WHERE id = 5", "DELETE is wrong", "WHERE is wrong", "id = 5 is wrong"], answer: 0, explanation: "DELETE requires the FROM keyword: DELETE FROM table_name." },
+      { code: `SELECT * FROM employees\nWHERE department = 'HR' AND OR salary > 50000;`, error: "AND OR is invalid SQL syntax", options: ["Can't use AND OR together — use either AND or OR", "WHERE is wrong", "department = 'HR' is wrong", "salary > 50000 is wrong"], answer: 0, explanation: "You cannot chain AND directly with OR without proper parentheses and conditions." },
+      { code: `INSERT INTO employees (name, salary)\nVALUES ('Alice', 50000, 'HR');`, error: "Column count doesn't match value count", options: ["2 columns specified but 3 values provided", "INSERT INTO is wrong", "VALUES is wrong", "name is wrong"], answer: 0, explanation: "The number of columns must match the number of values in an INSERT statement." },
+      { code: `SELECT name FROM employees\nWHERE salary BETWEEN 3000 AND 2000;`, error: "BETWEEN range is reversed", options: ["BETWEEN lower AND upper — 3000 > 2000 so no rows match", "BETWEEN is wrong", "salary is wrong", "SELECT is wrong"], answer: 0, explanation: "BETWEEN requires the lower bound first. BETWEEN 3000 AND 2000 returns no rows." },
+    ],
+    medium: [
+      { code: `SELECT e.name, d.dept_name\nFROM employees e\nJOIN departments d ON e.id = d.id;`, error: "Wrong JOIN condition — should join on dept_id", options: ["Should join on e.dept_id = d.id, not e.id = d.id", "JOIN is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "Employees join Departments via dept_id, not employee id." },
+      { code: `SELECT name, salary\nFROM employees\nHAVING salary > 50000;`, error: "HAVING without GROUP BY", options: ["HAVING is for filtered groups — use WHERE for row-level filter", "HAVING is wrong syntax", "salary is wrong", "SELECT is wrong"], answer: 0, explanation: "HAVING is used with GROUP BY. Use WHERE salary > 50000 for row-level filtering." },
+      { code: `SELECT name FROM employees\nUNION\nSELECT dept_name, location FROM departments;`, error: "UNION requires same number of columns", options: ["First SELECT has 1 column, second has 2 — UNION requires matching columns", "UNION is wrong", "SELECT is wrong", "FROM is wrong"], answer: 0, explanation: "UNION requires the same number of columns with compatible types in each SELECT." },
+      { code: `SELECT AVG(salary) FROM employees\nWHERE AVG(salary) > 50000;`, error: "Aggregate function in WHERE clause", options: ["Can't use AVG() in WHERE — use HAVING with GROUP BY instead", "AVG is wrong", "WHERE is wrong", "SELECT is wrong"], answer: 0, explanation: "Aggregate functions cannot be used in WHERE. Use HAVING after GROUP BY." },
+      { code: `SELECT name FROM employees\nORDER BY salary\nLIMIT 5\nWHERE salary > 30000;`, error: "WHERE must come before ORDER BY and LIMIT", options: ["Clause order: SELECT, FROM, WHERE, ORDER BY, LIMIT", "ORDER BY is wrong", "LIMIT is wrong", "SELECT is wrong"], answer: 0, explanation: "SQL clauses must follow order: WHERE → ORDER BY → LIMIT." },
+      { code: `SELECT department, COUNT(*)\nFROM employees\nGROUP BY department\nHAVING COUNT(*) > 5\nORDER BY COUNT(*) DESC\nWHERE salary > 40000;`, error: "WHERE after HAVING is invalid order", options: ["WHERE must come before GROUP BY and HAVING", "HAVING is wrong", "ORDER BY is wrong", "GROUP BY is wrong"], answer: 0, explanation: "Correct order: WHERE → GROUP BY → HAVING → ORDER BY." },
+      { code: `SELECT name FROM employees e\nLEFT JOIN departments d ON e.dept_id = d.id\nWHERE d.location = 'NYC';`, error: "WHERE on right table nullifies LEFT JOIN", options: ["WHERE d.location filters out NULLs — use AND in ON clause or INNER JOIN", "LEFT JOIN is wrong", "ON is wrong", "SELECT is wrong"], answer: 0, explanation: "Filtering on the right table with WHERE turns a LEFT JOIN into an INNER JOIN effectively." },
+      { code: `CREATE TABLE orders (\n    id INT PRIMARY KEY,\n    customer_id INT,\n    FOREIGN KEY (customer_id) REFERENCES customers(id)\n        ON DELETE RESTRICT\n);\nDELETE FROM customers WHERE id = 1;`, error: "Foreign key constraint prevents delete", options: ["ON DELETE RESTRICT blocks deleting customers with existing orders", "FOREIGN KEY is wrong", "PRIMARY KEY is wrong", "DELETE is wrong"], answer: 0, explanation: "RESTRICT prevents deleting a parent row that has child rows referencing it." },
+      { code: `SELECT name FROM employees\nWHERE id IN (\n    SELECT manager_id FROM departments\n    WHERE manager_id IS NULL\n);`, error: "Subquery returns NULL — IN with NULL never matches", options: ["IN (NULL) never matches any row — use IS NOT NULL in subquery", "IN is wrong", "SELECT is wrong", "WHERE is wrong"], answer: 0, explanation: "NULL values in an IN list cause no matches due to three-valued logic in SQL." },
+      { code: `SELECT name, salary * 12 annual\nFROM employees\nWHERE annual > 600000;`, error: "Column alias not usable in WHERE", options: ["Column aliases defined in SELECT can't be used in WHERE — use expression", "WHERE is wrong", "* 12 is wrong", "SELECT is wrong"], answer: 0, explanation: "Column aliases are resolved after WHERE. Repeat the expression: WHERE salary * 12 > 600000." },
+    ],
+    hard: [
+      { code: `SELECT id, name,\n    ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary)\nFROM employees\nWHERE ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary) = 1;`, error: "Window function in WHERE clause is invalid", options: ["Window functions can't be in WHERE — use a subquery or CTE", "ROW_NUMBER is wrong", "PARTITION BY is wrong", "SELECT is wrong"], answer: 0, explanation: "Window functions are not allowed in WHERE. Wrap the query in a subquery or CTE and filter there." },
+      { code: `WITH cte AS (\n    SELECT * FROM orders WHERE status = 'pending'\n)\nDELETE FROM cte;`, error: "Cannot DELETE from a CTE directly in most databases", options: ["Most SQL dialects don't support DELETE directly from a CTE", "WITH is wrong", "DELETE is wrong", "status is wrong"], answer: 0, explanation: "Deleting from a CTE is not supported in most SQL databases. Use a subquery in WHERE instead." },
+      { code: `SELECT customer_id, SUM(amount)\nFROM orders\nGROUP BY customer_id\nHAVING SUM(amount) > 1000\nORDER BY SUM(amount) DESC\nLIMIT 10 OFFSET 0;`, error: "Correct query — no error", options: ["This query is actually correct SQL", "HAVING is wrong", "OFFSET is wrong", "GROUP BY is wrong"], answer: 0, explanation: "This is valid SQL. The clauses are in correct order with valid syntax." },
+      { code: `SELECT *\nFROM employees\nWHERE salary = (\n    SELECT MAX(salary) FROM employees\n    GROUP BY department\n);`, error: "Subquery returns multiple rows — can't use = with multiple rows", options: ["= expects single value but subquery returns one MAX per department", "MAX is wrong", "WHERE is wrong", "SELECT * is wrong"], answer: 0, explanation: "= can only compare with a scalar. Use IN or add a condition to make the subquery return one row." },
+      { code: `BEGIN TRANSACTION;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\n-- application crash here\nCOMMIT;`, error: "COMMIT never reached — transaction partially applied", options: ["If crash occurs before COMMIT, changes are rolled back — but app may think it succeeded", "BEGIN TRANSACTION is wrong", "UPDATE is wrong", "COMMIT is wrong"], answer: 0, explanation: "If the application crashes before COMMIT, the DB rolls back. But the app may not handle this, causing inconsistency." },
+      { code: `SELECT name FROM employees\nWHERE department_id NOT IN (\n    SELECT id FROM departments WHERE active = 1\n);`, error: "NOT IN with NULL in subquery returns no rows", options: ["If subquery returns any NULL, NOT IN returns false for all rows", "NOT IN is wrong", "WHERE is wrong", "SELECT is wrong"], answer: 0, explanation: "NOT IN with a NULL value in the subquery results returns no rows due to SQL's three-valued logic." },
+      { code: `SELECT a.name, b.name\nFROM employees a, employees b\nWHERE a.manager_id = b.id\nAND a.id = b.id;`, error: "Self-join condition contradicts manager relationship", options: ["a.id = b.id means employee is their own manager — likely a logic error", "self-join is wrong", "FROM syntax is wrong", "AND is wrong"], answer: 0, explanation: "a.manager_id = b.id should find the manager, but AND a.id = b.id means the employee manages themselves." },
+      { code: `SELECT department, AVG(salary)\nFROM employees\nGROUP BY department\nHAVING AVG(salary) > (\n    SELECT AVG(salary) FROM employees GROUP BY department\n);`, error: "Correlated subquery returns multiple rows in HAVING", options: ["Subquery returns one AVG per department — HAVING > multiple values is invalid", "HAVING is wrong", "AVG is wrong", "GROUP BY is wrong"], answer: 0, explanation: "The subquery returns multiple average values. Use a scalar subquery (no GROUP BY) to get overall average." },
+      { code: `SELECT DISTINCT name, department\nFROM employees\nORDER BY salary DESC;`, error: "ORDER BY column not in SELECT with DISTINCT", options: ["DISTINCT with ORDER BY salary fails — salary must be in SELECT", "DISTINCT is wrong", "ORDER BY is wrong", "FROM is wrong"], answer: 0, explanation: "When using DISTINCT, ORDER BY columns must appear in the SELECT list." },
+      { code: `CREATE INDEX idx_salary ON employees(salary);\nSELECT * FROM employees WHERE salary + 0 > 50000;`, error: "Index not used due to function/expression on column", options: ["salary + 0 prevents index usage — use WHERE salary > 50000 directly", "CREATE INDEX is wrong", "WHERE is wrong", "SELECT * is wrong"], answer: 0, explanation: "Applying an expression to the indexed column prevents the database from using the index." },
+    ],
+  },
+
+  // "web" maps to web dev
+  web: {
+    easy: [
+      { code: `<html>\n<body>\n  <p>Hello World<p>\n</body>\n</html>`, error: "Paragraph tag not properly closed", options: ["Should be </p> to close paragraph, not <p>", "html tag is wrong", "body tag is wrong", "Hello World needs quotes"], answer: 0, explanation: "HTML tags must be closed properly. Use </p> to close the paragraph." },
+      { code: `<html>\n<body>\n  <img src="photo.jpg">\n  <a href=google.com>Click</a>\n</body>`, error: "href value not quoted", options: ["href attribute value must be in quotes: href=\"google.com\"", "img tag is wrong", "a tag is wrong", "Click needs quotes"], answer: 0, explanation: "HTML attribute values must be enclosed in quotes." },
+      { code: `<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n<body>\n  <p>Content</p>\n</body>\n</html>`, error: "Missing closing </head> tag", options: ["</head> tag is missing before <body>", "DOCTYPE is wrong", "title is wrong", "body is wrong"], answer: 0, explanation: "The <head> section must be closed with </head> before the <body> opens." },
+      { code: `.box {\n  color: red\n  background: blue;\n}`, error: "Missing semicolon in CSS", options: ["Missing semicolon after color: red", "color: red is wrong", "background is wrong", ".box selector is wrong"], answer: 0, explanation: "CSS property declarations must end with a semicolon." },
+      { code: `<style>\n  p {\n    font-size: 16;\n  }\n</style>`, error: "Missing CSS unit on font-size", options: ["font-size: 16 needs a unit like px: font-size: 16px", "p selector is wrong", "font-size is wrong", "style tag is wrong"], answer: 0, explanation: "CSS length values require units (px, em, rem, etc.) except for line-height and 0." },
+      { code: `const btn = document.getElementById("myBtn")\nbtn.AddEventListener("click", () => {\n  console.log("clicked");\n});`, error: "Wrong method name — AddEventListener should be addEventListener", options: ["JavaScript is case-sensitive: use addEventListener not AddEventListener", "getElementById is wrong", "click is wrong", "console.log is wrong"], answer: 0, explanation: "JavaScript method names are case-sensitive. The correct method is addEventListener (lowercase 'a')." },
+      { code: `<form>\n  <input type="text" name="user">\n  <button>Submit</button>\n</form>`, error: "Button inside form defaults to type='submit' — may cause unintended submission", options: ["Add type='button' to prevent unintended form submission", "input is wrong", "form tag is wrong", "name attribute is wrong"], answer: 0, explanation: "A <button> inside a form defaults to type='submit'. Add type='button' if you don't want it to submit." },
+      { code: `<div class=container>\n  <p>Hello</p>\n</div>`, error: "Class attribute value not quoted", options: ["Class value must be quoted: class=\"container\"", "div tag is wrong", "p tag is wrong", "Hello needs escaping"], answer: 0, explanation: "HTML attribute values should always be enclosed in quotes." },
+      { code: `body {\n  margin: 0;\n  padding: 0;\n}\n\n.header {\n  width: 100%\n  height: 60px;\n}`, error: "Missing semicolon in CSS", options: ["Missing semicolon after width: 100%", "margin: 0 is wrong", "height is wrong", ".header selector is wrong"], answer: 0, explanation: "Every CSS declaration must end with a semicolon." },
+      { code: `const x = 5;\nif (x = 10) {\n  console.log("ten");\n}`, error: "Assignment instead of comparison in if", options: ["Use === for comparison, = assigns a value (always truthy)", "const is wrong", "console.log is wrong", "if syntax is wrong"], answer: 0, explanation: "= is assignment. Use === for strict comparison in JavaScript." },
+    ],
+    medium: [
+      { code: `const arr = [1, 2, 3];\narr.forEach(num => {\n  if (num === 2) return arr;\n});\nconsole.log("done");`, error: "return inside forEach doesn't break the loop", options: ["return in forEach only exits current iteration, not the loop", "forEach is wrong", "const is wrong", "console.log is wrong"], answer: 0, explanation: "forEach doesn't support early exit via return. Use for...of or Array.some() to break early." },
+      { code: `async function getData() {\n  const res = fetch("https://api.example.com/data");\n  const data = res.json();\n  return data;\n}`, error: "Missing await keywords", options: ["fetch() and res.json() return Promises — must await both", "async is wrong", "const is wrong", "return is wrong"], answer: 0, explanation: "fetch() returns a Promise. Without await, res is a Promise, and res.json() will fail." },
+      { code: `const obj = { a: 1, b: 2 };\nconst { a, c } = obj;\nconsole.log(c);`, error: "Destructuring non-existent property", options: ["obj has no 'c' property — c will be undefined", "const is wrong", "console.log is wrong", "destructuring syntax is wrong"], answer: 0, explanation: "Destructuring a property that doesn't exist yields undefined." },
+      { code: `.container {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  height: 100%;\n}\n/* parent has no fixed height */`, error: "height: 100% with no set parent height", options: ["100% height requires a parent with explicit height set", "display: flex is wrong", "justify-content is wrong", "align-items is wrong"], answer: 0, explanation: "height: 100% only works if the parent element has an explicit height defined." },
+      { code: `for (var i = 0; i < 3; i++) {\n  setTimeout(() => console.log(i), 1000);\n}`, error: "var in loop closure — logs 3 three times", options: ["var is function-scoped; all callbacks share same i which becomes 3", "setTimeout is wrong", "console.log is wrong", "for loop is wrong"], answer: 0, explanation: "var is function-scoped. By the time timeouts run, i is 3. Use let for block scoping." },
+      { code: `const p = new Promise((resolve, reject) => {\n  resolve("done");\n  reject("error");\n});\np.then(v => console.log(v)).catch(e => console.log(e));`, error: "reject after resolve has no effect", options: ["Once a Promise is resolved, calling reject has no effect", "new Promise is wrong", "then is wrong", "catch is wrong"], answer: 0, explanation: "Promises can only be settled once. reject() after resolve() is ignored." },
+      { code: `<div id="box">\n  <p>Text</p>\n</div>\n<script>\n  const box = document.querySelector('.box');\n  box.style.color = 'red';\n</script>`, error: "Wrong selector — id vs class mismatch", options: ["Element has id='box' but querySelector uses '.box' (class selector)", "querySelector is wrong", "style.color is wrong", "script tag is wrong"], answer: 0, explanation: "'.box' selects by class. The element uses id='box'. Use '#box' selector instead." },
+      { code: `const nums = [1, [2, [3, [4]]]];\nconsole.log(nums.flat());`, error: "flat() only flattens one level by default", options: ["flat() without argument flattens only 1 level deep — result: [1, 2, [3, [4]]]", "flat is wrong", "const is wrong", "console.log is wrong"], answer: 0, explanation: "Array.flat() flattens one level by default. Use .flat(Infinity) to fully flatten nested arrays." },
+      { code: `function Counter() {\n  this.count = 0;\n  setTimeout(function() {\n    this.count++;\n    console.log(this.count);\n  }, 1000);\n}`, error: "Wrong 'this' context inside regular function callback", options: ["Regular function has its own 'this' — use arrow function to preserve Counter's this", "setTimeout is wrong", "this.count is wrong", "function is wrong"], answer: 0, explanation: "Regular functions have their own 'this'. Use an arrow function (() =>) to inherit 'this' from Counter." },
+      { code: `const map = new Map();\nmap.set({id: 1}, "Alice");\nmap.set({id: 1}, "Bob");\nconsole.log(map.size);`, error: "Object keys in Map compared by reference", options: ["Two different object literals are different references — map has 2 entries", "Map is wrong", "set is wrong", "console.log is wrong"], answer: 0, explanation: "Maps use reference equality for object keys. Two {id:1} objects are different keys." },
+    ],
+    hard: [
+      { code: `const obj = {};\nObject.defineProperty(obj, 'x', {\n  get() { return this._x || 0; },\n  set(v) { this._x = v; }\n});\nobj.x = 5;\nconsole.log(obj.x);`, error: "Correct code — no error", options: ["This code is actually correct and works as expected", "defineProperty is wrong", "get/set is wrong", "this._x is wrong"], answer: 0, explanation: "This code correctly uses a getter/setter via Object.defineProperty and outputs 5." },
+      { code: `useEffect(() => {\n  fetch('/api/data')\n    .then(r => r.json())\n    .then(data => setData(data));\n}, []);`, error: "No cleanup — potential memory leak on unmount", options: ["If component unmounts before fetch completes, setState on unmounted component leaks", "useEffect is wrong", "fetch is wrong", "setData is wrong"], answer: 0, explanation: "Without cleanup, state updates after unmount cause React memory leak warnings. Use AbortController." },
+      { code: `const cache = {};\nfunction memoize(fn) {\n  return function(...args) {\n    const key = args.toString();\n    if (cache[key]) return cache[key];\n    return cache[key] = fn(...args);\n  };\n}`, error: "Shared cache across all memoized functions", options: ["All memoize calls share the same cache object — key collisions possible", "toString is wrong", "function is wrong", "const cache is wrong"], answer: 0, explanation: "cache is defined outside memoize, so all memoized functions share the same cache object." },
+      { code: `class EventEmitter {\n  constructor() { this.events = {}; }\n  on(event, cb) {\n    this.events[event] = cb;\n  }\n  emit(event, data) {\n    this.events[event](data);\n  }\n}`, error: "Only one listener per event — overwrites previous", options: ["this.events[event] = cb overwrites previous listener — use array", "constructor is wrong", "emit is wrong", "on is wrong"], answer: 0, explanation: "Assigning directly overwrites previous callbacks. Use this.events[event] = [...(this.events[event]||[]), cb]." },
+      { code: `const handler = {\n  get(target, key) {\n    return key in target ? target[key] : 42;\n  }\n};\nconst p = new Proxy({a: 1}, handler);\nconsole.log(p.b);`, error: "Correct Proxy usage — no error", options: ["This is valid Proxy code that returns 42 for missing keys", "Proxy is wrong", "handler is wrong", "get is wrong"], answer: 0, explanation: "This correctly creates a Proxy that returns 42 for properties not in the target." },
+      { code: `function* gen() {\n  yield 1;\n  yield 2;\n  yield 3;\n}\nconst g = gen();\nconsole.log([...g]);\nconsole.log([...g]);`, error: "Generator exhausted after first spread", options: ["Generator is consumed by first spread — second spread gives empty array", "function* is wrong", "yield is wrong", "console.log is wrong"], answer: 0, explanation: "Like iterators, generators can only be iterated once. The second spread produces []." },
+      { code: `const nums = [1, 2, 3, 4, 5];\nconst result = nums\n  .filter(n => n % 2 === 0)\n  .map(n => n * 2)\n  .reduce((acc, n) => acc + n);`, error: "reduce without initial value on potentially empty array", options: ["If filter returns empty array, reduce without initial value throws TypeError", "filter is wrong", "map is wrong", "reduce is wrong"], answer: 0, explanation: "reduce() without an initial value throws if the array is empty. Always provide an initial value." },
+      { code: `const obj = { x: 1 };\nconst frozen = Object.freeze(obj);\nfrozen.x = 99;\nconsole.log(frozen.x);`, error: "Silently fails — frozen object not modified", options: ["Object.freeze prevents modification; frozen.x stays 1 (silently fails in non-strict mode)", "Object.freeze is wrong", "frozen.x is wrong", "const is wrong"], answer: 0, explanation: "Attempting to modify a frozen object silently fails in non-strict mode (throws in strict mode)." },
+      { code: `class A {\n  constructor() {\n    this.name = this.getName();\n  }\n  getName() { return 'A'; }\n}\nclass B extends A {\n  getName() { return 'B'; }\n}\nconsole.log(new B().name);`, error: "Virtual dispatch in constructor — getName() resolves to B", options: ["B's getName() is called during A's constructor — name is 'B', not 'A'", "constructor is wrong", "extends is wrong", "console.log is wrong"], answer: 0, explanation: "JavaScript resolves methods polymorphically. During A's constructor, this is a B instance so B.getName() runs." },
+      { code: `const a = [1, 2, 3];\nconst b = [1, 2, 3];\nconsole.log(a == b);\nconsole.log(a === b);`, error: "Array equality always false — different references", options: ["Arrays are compared by reference — both == and === return false", "const is wrong", "console.log is wrong", "=== is wrong"], answer: 0, explanation: "Arrays (and all objects) are compared by reference in JavaScript. Two separate arrays are never equal with == or ===." },
+    ],
+  },
+
+  dsa: {
+    easy: [
+      { code: `function linearSearch(arr, target) {\n  for (let i = 0; i <= arr.length; i++) {\n    if (arr[i] === target) return i;\n  }\n  return -1;\n}`, error: "Off-by-one in loop condition", options: ["i <= arr.length accesses arr[arr.length] which is undefined", "return -1 is wrong", "=== is wrong", "let i = 0 is wrong"], answer: 0, explanation: "Loop should use i < arr.length. i <= arr.length goes one past the last valid index." },
+      { code: `function factorial(n) {\n  if (n === 0) return 1;\n  return n * factorial(n);\n}`, error: "Infinite recursion — missing base case progression", options: ["Should call factorial(n-1) not factorial(n)", "return 1 is wrong", "=== is wrong", "function is wrong"], answer: 0, explanation: "factorial(n) calls itself with the same n forever. Use factorial(n-1)." },
+      { code: `function reverseString(s) {\n  return s.split("").reverse;\n}`, error: "reverse not called — missing parentheses", options: [".reverse should be .reverse() to invoke the method", "split is wrong", "return is wrong", "s.split is wrong"], answer: 0, explanation: ".reverse is a reference to the method. You need .reverse() to call it." },
+      { code: `function isPalindrome(s) {\n  return s == s.split("").reverse().join("");\n}`, error: "Using == instead of === for string comparison", options: ["Use === for strict equality — == may coerce types unexpectedly", "split is wrong", "reverse is wrong", "join is wrong"], answer: 0, explanation: "Always use === for comparisons in JavaScript to avoid type coercion surprises." },
+      { code: `function binarySearch(arr, t) {\n  let lo = 0, hi = arr.length;\n  while (lo < hi) {\n    let mid = Math.floor((lo + hi) / 2);\n    if (arr[mid] === t) return mid;\n    else if (arr[mid] < t) lo = mid;\n    else hi = mid;\n  }\n  return -1;\n}`, error: "lo = mid causes infinite loop", options: ["Should be lo = mid + 1 to ensure progress past mid", "hi = mid is wrong", "Math.floor is wrong", "while is wrong"], answer: 0, explanation: "Setting lo = mid can cause an infinite loop when lo + 1 == hi. Use lo = mid + 1." },
+      { code: `function sumArray(arr) {\n  let sum = 0;\n  for (let i = 1; i < arr.length; i++) {\n    sum += arr[i];\n  }\n  return sum;\n}`, error: "Loop starts at 1 — misses first element", options: ["Loop should start at i = 0 to include arr[0]", "return sum is wrong", "+= is wrong", "let sum = 0 is wrong"], answer: 0, explanation: "Starting the loop at i = 1 skips arr[0], giving an incorrect sum." },
+      { code: `function maxElement(arr) {\n  let max = 0;\n  for (const n of arr) {\n    if (n > max) max = n;\n  }\n  return max;\n}`, error: "Initial max = 0 fails for all-negative arrays", options: ["If all elements are negative, max stays 0 — use arr[0] as initial value", "for...of is wrong", "return max is wrong", "const n is wrong"], answer: 0, explanation: "Initializing max to 0 gives wrong results for arrays with all negative numbers." },
+      { code: `function countOccurrences(arr, val) {\n  let count = 0;\n  for (const x of arr) {\n    if (x = val) count++;\n  }\n  return count;\n}`, error: "Assignment instead of comparison", options: ["x = val assigns val to x (always truthy) — use x === val", "count++ is wrong", "for...of is wrong", "return count is wrong"], answer: 0, explanation: "x = val assigns the value. Use x === val to compare." },
+      { code: `function removeDuplicates(arr) {\n  return [...new Map(arr)];\n}`, error: "Map should be Set for deduplication", options: ["Use new Set(arr) not new Map(arr) to remove duplicates", "spread is wrong", "return is wrong", "arr is wrong"], answer: 0, explanation: "Set stores unique values. Map stores key-value pairs. Use new Set(arr) for deduplication." },
+      { code: `function twoSum(nums, target) {\n  for (let i = 0; i < nums.length; i++) {\n    for (let j = 0; j < nums.length; j++) {\n      if (nums[i] + nums[j] === target) return [i, j];\n    }\n  }\n}`, error: "Inner loop allows j = i — same element used twice", options: ["j should start at i+1 to avoid using same index twice", "return [i,j] is wrong", "=== is wrong", "outer loop is wrong"], answer: 0, explanation: "Both loops start at 0, so i and j can be equal, using the same element twice." },
+    ],
+    medium: [
+      { code: `function mergeSort(arr) {\n  if (arr.length <= 1) return arr;\n  const mid = Math.floor(arr.length / 2);\n  const left = mergeSort(arr.slice(0, mid));\n  const right = mergeSort(arr.slice(mid));\n  return merge(left, right);\n}\nfunction merge(l, r) {\n  const res = [];\n  while (l.length && r.length) {\n    res.push(l[0] < r[0] ? l.shift() : r.shift());\n  }\n  return res.concat(l, r);\n}`, error: "Array.shift() is O(n) — inefficient merge", options: ["Using shift() inside loop makes merge O(n²) — use index pointers instead", "concat is wrong", "slice is wrong", "push is wrong"], answer: 0, explanation: "shift() removes from the front of an array in O(n). Use index pointers for O(n) merge." },
+      { code: `function quickSort(arr) {\n  if (arr.length <= 1) return arr;\n  const pivot = arr[0];\n  const left = arr.filter(x => x < pivot);\n  const right = arr.filter(x => x > pivot);\n  return [...quickSort(left), pivot, ...quickSort(right)];\n}`, error: "Duplicates of pivot are lost", options: ["x > pivot and x < pivot both exclude elements equal to pivot", "filter is wrong", "spread is wrong", "arr[0] is wrong"], answer: 0, explanation: "Elements equal to pivot are excluded from both left and right. Use x >= pivot or include pivot multiple times." },
+      { code: `class Stack {\n  constructor() { this.items = []; }\n  push(el) { this.items.push(el); }\n  pop() { return this.items.pop(); }\n  peek() { return this.items[this.items.length]; }\n}`, error: "peek() off-by-one — returns undefined", options: ["Last index is items.length-1, not items.length", "push is wrong", "pop is wrong", "constructor is wrong"], answer: 0, explanation: "Array last index is length - 1. items[items.length] is always undefined." },
+      { code: `function hasCycle(head) {\n  let slow = head, fast = head;\n  while (fast && fast.next) {\n    slow = slow.next;\n    fast = fast.next;\n    if (slow === fast) return true;\n  }\n  return false;\n}`, error: "Fast pointer only advances one step", options: ["Fast should advance two steps: fast = fast.next.next", "slow = slow.next is wrong", "return true is wrong", "while condition is wrong"], answer: 0, explanation: "Floyd's cycle detection requires fast to move 2 steps. fast = fast.next only moves 1." },
+      { code: `function isBalanced(s) {\n  const stack = [];\n  for (const c of s) {\n    if ('([{'.includes(c)) stack.push(c);\n    else {\n      if (stack.pop() !== c) return false;\n    }\n  }\n  return stack.length === 0;\n}`, error: "Closing bracket compared to opening bracket directly", options: ["stack.pop() gives opening bracket but c is closing — need matching check", "stack.push is wrong", "includes is wrong", "return is wrong"], answer: 0, explanation: "You need to check that the popped opening bracket matches the corresponding closing bracket." },
+      { code: `function dijkstra(graph, start) {\n  const dist = {};\n  const visited = new Set();\n  dist[start] = 0;\n  while (true) {\n    const node = getMinDist(dist, visited);\n    if (!node) break;\n    visited.add(node);\n    for (const [n, w] of graph[node]) {\n      dist[n] = dist[node] + w;\n    }\n  }\n  return dist;\n}`, error: "Distance not compared before updating", options: ["Should update dist[n] only if dist[node] + w < dist[n]", "visited is wrong", "while is wrong", "for...of is wrong"], answer: 0, explanation: "Dijkstra requires checking if the new path is shorter before updating the distance." },
+      { code: `function nthFibonacci(n) {\n  const dp = [0, 1];\n  for (let i = 2; i <= n; i++) {\n    dp[i] = dp[i-1] + dp[i-2];\n  }\n  return dp[n];\n}`, error: "Correct DP Fibonacci — no error for n >= 0", options: ["This code is actually correct for n >= 0", "dp = [0, 1] is wrong", "for loop is wrong", "return dp[n] is wrong"], answer: 0, explanation: "This is valid dynamic programming for Fibonacci numbers." },
+      { code: `function bfs(graph, start) {\n  const visited = new Set();\n  const queue = [start];\n  while (queue.length) {\n    const node = queue.pop();\n    if (visited.has(node)) continue;\n    visited.add(node);\n    for (const n of graph[node]) queue.push(n);\n  }\n}`, error: "Using pop() instead of shift() makes it DFS not BFS", options: ["pop() removes from end (LIFO) — use shift() for FIFO queue behavior", "visited.has is wrong", "queue.push is wrong", "while is wrong"], answer: 0, explanation: "BFS needs a queue (FIFO). Array.pop() removes from the end, making it a stack (DFS behavior)." },
+      { code: `function longestCommonSubsequence(a, b) {\n  const dp = Array(a.length).fill(0).map(() => Array(b.length).fill(0));\n  for (let i = 1; i <= a.length; i++) {\n    for (let j = 1; j <= b.length; j++) {\n      if (a[i] === b[j]) dp[i][j] = dp[i-1][j-1] + 1;\n      else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);\n    }\n  }\n  return dp[a.length][b.length];\n}`, error: "DP table size too small — index out of bounds", options: ["Table is (a.length x b.length) but loop needs (a.length+1 x b.length+1)", "Array.fill is wrong", "Math.max is wrong", "return is wrong"], answer: 0, explanation: "LCS DP needs a (m+1)×(n+1) table. Creating it with m×n causes index out of bounds." },
+      { code: `function treeHeight(root) {\n  if (!root) return 0;\n  return 1 + Math.max(treeHeight(root.left), treeHeight(root.right));\n}\n// Called 1000 times on same tree`, error: "Repeated computation — exponential time without memoization", options: ["Recursive calls recompute subtree heights every call — cache results", "Math.max is wrong", "return 0 is wrong", "root.left is wrong"], answer: 0, explanation: "Without memoization, treeHeight recomputes all subtree heights on every call. Cache results." },
+    ],
+    hard: [
+      { code: `function knapsack(weights, values, W) {\n  const n = weights.length;\n  const dp = Array(W+1).fill(0);\n  for (let i = 0; i < n; i++) {\n    for (let w = 0; w <= W; w++) {\n      if (weights[i] <= w)\n        dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);\n    }\n  }\n  return dp[W];\n}`, error: "Inner loop direction wrong — unbounded knapsack instead of 0/1", options: ["0/1 knapsack needs inner loop from W down to weights[i], not 0 to W", "dp = Array is wrong", "Math.max is wrong", "return dp[W] is wrong"], answer: 0, explanation: "Forward iteration allows an item to be used multiple times (unbounded). Iterate w from W down to weights[i] for 0/1 knapsack." },
+      { code: `class MinHeap {\n  constructor() { this.heap = []; }\n  push(val) {\n    this.heap.push(val);\n    this._bubbleUp(this.heap.length - 1);\n  }\n  _bubbleUp(i) {\n    while (i > 0) {\n      const parent = Math.floor((i - 1) / 2);\n      if (this.heap[parent] > this.heap[i]) {\n        [this.heap[parent], this.heap[i]] = [this.heap[i], this.heap[parent]];\n        i = i;\n      } else break;\n    }\n  }\n}`, error: "i = i doesn't update index after swap", options: ["After swapping, i should become parent to continue bubbling up", "Math.floor is wrong", "push is wrong", "while i > 0 is wrong"], answer: 0, explanation: "After swapping with the parent, i must be set to parent to continue the bubble-up process." },
+      { code: `function topologicalSort(graph) {\n  const visited = new Set();\n  const result = [];\n  function dfs(node) {\n    visited.add(node);\n    for (const n of graph[node]) {\n      if (!visited.has(n)) dfs(n);\n    }\n    result.push(node);\n  }\n  for (const node of Object.keys(graph)) dfs(node);\n  return result;\n}`, error: "No cycle detection — infinite loop on cyclic graph", options: ["Topological sort only works on DAGs — no check for back edges (cycles)", "result.push is wrong", "dfs is wrong", "visited.add is wrong"], answer: 0, explanation: "Without cycle detection, this will recurse infinitely on cyclic graphs. Add a 'processing' set to detect back edges." },
+      { code: `function countIslands(grid) {\n  let count = 0;\n  function dfs(r, c) {\n    if (r < 0 || r >= grid.length || c < 0 || c >= grid[0].length) return;\n    if (grid[r][c] !== '1') return;\n    dfs(r+1,c); dfs(r-1,c); dfs(r,c+1); dfs(r,c-1);\n  }\n  for (let r = 0; r < grid.length; r++)\n    for (let c = 0; c < grid[0].length; c++)\n      if (grid[r][c] === '1') { count++; dfs(r,c); }\n  return count;\n}`, error: "Cell not marked visited — infinite recursion", options: ["grid[r][c] is never set to '0' after visiting — causes infinite DFS", "count++ is wrong", "dfs calls are wrong", "return count is wrong"], answer: 0, explanation: "Without marking visited cells (set to '0'), DFS will revisit cells and recurse infinitely." },
+      { code: `function slidingWindowMax(nums, k) {\n  const result = [];\n  for (let i = 0; i <= nums.length - k; i++) {\n    let max = nums[i];\n    for (let j = i; j < i + k; j++) {\n      max = Math.max(max, nums[j]);\n    }\n    result.push(max);\n  }\n  return result;\n}`, error: "O(n*k) brute force — should use deque for O(n)", options: ["Nested loop is O(n*k) — optimal solution uses a monotonic deque in O(n)", "Math.max is wrong", "result.push is wrong", "for loop is wrong"], answer: 0, explanation: "Brute force sliding window max is O(n*k). A monotonic deque gives O(n) time complexity." },
+      { code: `function longestPalindrome(s) {\n  let result = '';\n  for (let i = 0; i < s.length; i++) {\n    expand(i, i);\n    expand(i, i+1);\n  }\n  function expand(l, r) {\n    while (l >= 0 && r < s.length && s[l] === s[r]) { l--; r++; }\n    if (r - l - 1 > result.length) result = s.slice(l, r);\n  }\n  return result;\n}`, error: "slice indices wrong — l was decremented one extra", options: ["After while, l is one past the palindrome start — use s.slice(l+1, r)", "expand is wrong", "while is wrong", "let result = '' is wrong"], answer: 0, explanation: "The while loop exits with l one position before the palindrome start. Use s.slice(l+1, r)." },
+      { code: `function wordBreak(s, wordDict) {\n  const set = new Set(wordDict);\n  const dp = Array(s.length + 1).fill(false);\n  dp[0] = true;\n  for (let i = 1; i <= s.length; i++) {\n    for (let j = 0; j < i; j++) {\n      if (dp[j] && set.has(s.slice(i, j))) { dp[i] = true; break; }\n    }\n  }\n  return dp[s.length];\n}`, error: "slice arguments reversed", options: ["Should be s.slice(j, i) not s.slice(i, j)", "dp[0] = true is wrong", "set.has is wrong", "for loop is wrong"], answer: 0, explanation: "s.slice(i, j) when i > j returns an empty string. The substring from j to i should be s.slice(j, i)." },
+      { code: `function robHouses(nums) {\n  let prev2 = 0, prev1 = 0;\n  for (const n of nums) {\n    const curr = Math.max(prev1, prev2 + n);\n    prev1 = curr;\n    prev2 = prev1;\n  }\n  return prev1;\n}`, error: "prev2 updated after prev1 — loses old prev1 value", options: ["prev2 should be set to old prev1 before prev1 is updated", "Math.max is wrong", "return prev1 is wrong", "const curr is wrong"], answer: 0, explanation: "prev2 = prev1 after prev1 = curr stores the new value, not the old prev1. Swap assignment order." },
+      { code: `class TrieNode {\n  constructor() { this.children = {}; this.isEnd = false; }\n}\nclass Trie {\n  constructor() { this.root = new TrieNode(); }\n  insert(word) {\n    let node = this.root;\n    for (const c of word) {\n      if (!node.children[c]) node.children[c] = new TrieNode();\n      node = node.children[c];\n    }\n  }\n  search(word) {\n    let node = this.root;\n    for (const c of word) {\n      if (!node.children[c]) return false;\n      node = node.children[c];\n    }\n    return true;\n  }\n}`, error: "search() doesn't check isEnd — prefix matches as full word", options: ["Should return node.isEnd not true — otherwise prefixes match as words", "insert is wrong", "TrieNode is wrong", "constructor is wrong"], answer: 0, explanation: "Returning true at the end of search matches any prefix as a full word. Return node.isEnd instead." },
+      { code: `function numWays(n, k) {\n  if (n === 0) return 0;\n  if (n === 1) return k;\n  let same = k, diff = k * (k - 1);\n  for (let i = 3; i <= n; i++) {\n    const total = same + diff;\n    same = diff;\n    diff = total * (k - 1);\n  }\n  return same + diff;\n}`, error: "Correct paint fence DP — no error", options: ["This is valid paint fence DP returning correct total", "same = diff is wrong", "diff = total*(k-1) is wrong", "return same + diff is wrong"], answer: 0, explanation: "This correctly implements the paint fence DP algorithm." },
     ],
   },
 };
 
-const languageLabels = { python:"Python", c:"C", cpp:"C++", java:"Java", sql:"SQL", webdev:"Web Dev", dsa:"DSA" };
+// Normalise URL param to question bank key
+// URL might be "web", "webdev", "Web Dev", etc.
+const normaliseLangKey = (langId) => {
+  if (!langId) return null;
+  const lower = langId.toLowerCase().replace(/[^a-z]/g, "");
+  if (lower === "webdev" || lower === "web") return "web";
+  if (lower === "cpp" || lower === "c++") return "cpp";
+  return lower;
+};
 
-// Timer per level (seconds per question)
+const languageLabels = {
+  python: "Python", c: "C", cpp: "C++",
+  java: "Java", sql: "SQL", web: "Web Dev",
+  webdev: "Web Dev", dsa: "DSA",
+};
+
 const levelConfig = {
-  easy:   { label:"EASY",   color:"#22c55e", lives:3, timePerQ:35 },
-  medium: { label:"MEDIUM", color:"#f59e0b", lives:3, timePerQ:25 },
-  hard:   { label:"HARD",   color:"#ef4444", lives:3, timePerQ:18 },
+  easy:   { label: "Easy",   color: "#7C3AED", lives: 3, timeLimit: 35 },
+  medium: { label: "Medium", color: "#D97706", lives: 3, timeLimit: 25 },
+  hard:   { label: "Hard",   color: "#DC2626", lives: 3, timeLimit: 18 },
 };
 
 const TOTAL_Q    = 10;
 const PASS_SCORE = 8;
-const LETTERS    = ["A","B","C","D"];
+const LETTERS    = ["A", "B", "C", "D"];
 
 function shuffle(arr) {
   const a = [...arr];
-  for (let i = a.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [a[i],a[j]] = [a[j],a[i]];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
@@ -296,344 +320,646 @@ function shuffle(arr) {
 async function fetchFromAPI(language, level) {
   const prompt = `Generate exactly 10 "trace the error" coding questions for ${language} at ${level} difficulty.
 Each question shows buggy code and asks what the error is.
-Return ONLY valid JSON array, no markdown:
-[{"code":"...","error":"description","options":["correct error","wrong1","wrong2","wrong3"],"answer":0,"explanation":"..."}]`;
-  const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, messages:[{role:"user",content:prompt}] }) });
+Return ONLY valid JSON array, no markdown, no extra text:
+[{"code":"...","error":"description","options":["correct error description","wrong option 1","wrong option 2","wrong option 3"],"answer":0,"explanation":"..."}]
+Rules: answer is always index 0 in the options array. Make options realistic and plausible. Code should be 3-8 lines.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }]
+    }),
+  });
   const data = await res.json();
-  const text = data.content.map(i=>i.text||"").join("");
-  return JSON.parse(text.replace(/```json|```/g,"").trim());
+  const text = data.content.map(i => i.text || "").join("");
+  const cleaned = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+  return JSON.parse(cleaned);
 }
 
+// ── Timer Ring ────────────────────────────────────────────────────────────────
+const TimerRing = ({ timeLeft, timeLimit, color }) => {
+  const R             = 16;
+  const circumference = 2 * Math.PI * R;
+  const pct           = timeLeft / timeLimit;
+  const dashOffset    = circumference * (1 - pct);
+  const ringColor     = pct > 0.5 ? color : pct > 0.25 ? "#D97706" : "#DC2626";
+  const isUrgent      = timeLeft <= 5 && timeLeft > 0;
+
+  return (
+    <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
+      <svg width="44" height="44" viewBox="0 0 44 44"
+        style={{ transform: "rotate(-90deg)", animation: isUrgent ? "urgentPulse 0.55s ease-in-out infinite" : "none" }}>
+        <circle cx="22" cy="22" r={R} fill="none" stroke="#EDE8E1" strokeWidth="3.5" />
+        <circle cx="22" cy="22" r={R} fill="none" stroke={ringColor} strokeWidth="3.5"
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset}
+          style={{ transition: "stroke-dashoffset 0.92s linear, stroke 0.3s ease" }} />
+      </svg>
+      <span style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "center",
+        justifyContent: "center", fontSize: "13px", fontWeight: "800",
+        color: ringColor, lineHeight: 1, transition: "color 0.3s ease",
+      }}>
+        {timeLeft}
+      </span>
+    </div>
+  );
+};
+
+// ── Pass & Play Turn Banner ───────────────────────────────────────────────────
+const TurnBanner = ({ currentTurn, playerNames, scores, colors }) => (
+  <div style={{
+    background: colors[currentTurn],
+    borderRadius: "12px",
+    padding: "10px 16px",
+    marginBottom: "14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <span style={{ fontSize: "20px" }}>{currentTurn === 0 ? "🟣" : "🔵"}</span>
+      <div>
+        <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
+          {playerNames[currentTurn]}'s Turn
+        </div>
+        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)" }}>
+          Pass &amp; Play Mode
+        </div>
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: "16px" }}>
+      {[0, 1].map(i => (
+        <div key={i} style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: currentTurn === i ? "#fff" : "rgba(255,255,255,0.5)" }}>
+            {scores[i]}
+          </div>
+          <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {playerNames[i]}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const TraceTheError = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { gameId, langId, level } = useParams();
-  const { user } = useAuth();
+  const { user }  = useAuth();
 
-  const lang = languageLabels[langId] ?? langId;
-  const lvl  = levelConfig[level] ?? levelConfig.easy;
+  // ── Pass & Play state ──────────────────────────────────────────────────────
+  const { passAndPlay, player1, player2 } = location.state || {};
+  const playerNames  = [player1 || "Player 1", player2 || "Player 2"];
+  const playerColors = ["#7C3AED", "#0891b2"];
+  const [pnpScores,   setPnpScores]   = useState([0, 0]);
+  const [currentTurn, setCurrentTurn] = useState(0);
+  const [showHandoff, setShowHandoff] = useState(false);
+  const [nextTurnIdx, setNextTurnIdx] = useState(1);
 
-  const [phase,    setPhase]    = useState("loading");
-  const [questions,setQuestions]= useState([]);
-  const [current,  setCurrent]  = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [lives,    setLives]    = useState(lvl.lives);
-  const [score,    setScore]    = useState(0);
-  const [wrong,    setWrong]    = useState(0);
-  const [showExp,  setShowExp]  = useState(false);
-  const [animKey,  setAnimKey]  = useState(0);
+  const lang    = languageLabels[langId] ?? langId;
+  const lvl     = levelConfig[level] ?? levelConfig.easy;
+  const bankKey = normaliseLangKey(langId);
 
-  // ── Timer ──
-  const [timeLeft, setTimeLeft] = useState(lvl.timePerQ);
-  const timerRef  = useRef(null);
+  // ── Core quiz state ───────────────────────────────────────────────────────
+  const [phase,     setPhase]     = useState("loading");
+  const [questions, setQuestions] = useState([]);
+  const [current,   setCurrent]   = useState(0);
+  const [selected,  setSelected]  = useState(null);
+  const [lives,     setLives]     = useState(lvl.lives);
+  const [score,     setScore]     = useState(0);
+  const [wrong,     setWrong]     = useState(0);
+  const [showExp,   setShowExp]   = useState(false);
+  const [animKey,   setAnimKey]   = useState(0);
+  const [timeLeft,  setTimeLeft]  = useState(lvl.timeLimit);
+  const [timedOut,  setTimedOut]  = useState(false);
+  const timerRef = useRef(null);
 
-  const clearTimer = () => { if (timerRef.current) clearInterval(timerRef.current); };
-
-  const startTimer = useCallback(() => {
-    clearTimer();
-    setTimeLeft(lvl.timePerQ);
-    timerRef.current = setInterval(() => {
-      setTimeLeft(t => { if (t <= 1) { clearInterval(timerRef.current); return 0; } return t-1; });
-    }, 1000);
-  }, [lvl.timePerQ]);
-
-  // When timer hits 0
-  useEffect(() => {
-    if (timeLeft === 0 && phase === "quiz" && selected === null) handleTimeout();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
-
-  const handleTimeout = () => {
-    clearTimer();
-    const q = questions[current];
-    if (!q) return;
-    setSelected(-1); // -1 = timed out
-    setShowExp(true);
-    const nl = lives - 1;
-    setWrong(w => w+1);
-    setLives(nl);
-    if (nl === 0) setTimeout(() => setPhase("gameover"), 1800);
+  const clearTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
+  const resetTimer = useCallback(() => {
+    clearTimer();
+    setTimeLeft(lvl.timeLimit);
+    setTimedOut(false);
+  }, [lvl.timeLimit]);
+
+  // ── Timer tick ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "quiz" || selected !== null || timedOut || showHandoff) return;
+    clearTimer();
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearTimer();
+          setTimedOut(true);
+          setShowExp(true);
+          setWrong(w => w + 1);
+          setLives(l => {
+            const next = l - 1;
+            if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
+            return next;
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return clearTimer;
+  }, [phase, selected, timedOut, current, showHandoff]);
+
+  useEffect(() => { if (selected !== null) clearTimer(); }, [selected]);
+  useEffect(() => () => clearTimer(), []);
+
+  // ── Load questions ────────────────────────────────────────────────────────
   const loadQuestions = useCallback(async () => {
     setPhase("loading");
     clearTimer();
-    const bankKey = langId?.toLowerCase();
-    const bank    = QUESTION_BANK[bankKey]?.[level];
 
-    if (bank && bank.length >= TOTAL_Q) {
-      setQuestions(shuffle(bank).slice(0,TOTAL_Q).map(q => ({ ...q, options: shuffle([...q.options]), answer: 0 })));
-    } else {
+    const bank = QUESTION_BANK[bankKey]?.[level];
+
+    const makeSet = (raw) =>
+      shuffle(raw && raw.length ? raw : []).slice(0, TOTAL_Q)
+        .map(q => {
+          const answerText = q.options[q.answer];
+          const shuffled   = shuffle([...q.options]);
+          return { ...q, options: shuffled, answer: shuffled.indexOf(answerText) };
+        });
+
+    let raw = bank && bank.length >= TOTAL_Q ? bank : null;
+    if (!raw) {
       try {
-        const qs = await fetchFromAPI(lang, level);
-        setQuestions(qs.slice(0,TOTAL_Q));
-      } catch {
-        setQuestions(shuffle(bank??[]).slice(0,TOTAL_Q));
+        raw = await fetchFromAPI(lang, level);
+      } catch (e) {
+        console.error("API fetch failed, using bank fallback:", e);
+        raw = bank ?? [];
       }
     }
 
+    setQuestions(makeSet(raw));
     setCurrent(0); setSelected(null); setShowExp(false);
     setLives(lvl.lives); setScore(0); setWrong(0);
-    setAnimKey(k=>k+1);
+    setPnpScores([0, 0]); setCurrentTurn(0);
+    setAnimKey(k => k + 1);
+    resetTimer();
     setPhase("quiz");
-  }, [langId, level, lang, lvl.lives]);
-
-  // Start timer when quiz begins
-  useEffect(() => {
-    if (phase === "quiz") startTimer();
-    return () => clearTimer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [bankKey, level, lang, lvl.lives, resetTimer]);
 
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
-  const q         = questions[current];
-  const progress  = questions.length ? (current/TOTAL_Q)*100 : 0;
-  const isTimeout = selected === -1;
-  const isCorrect = !isTimeout && selected !== null && selected === q?.answer;
-  const timerPct  = timeLeft / lvl.timePerQ;
-  const timerColor = timerPct > 0.5 ? "#22c55e" : timerPct > 0.25 ? "#f59e0b" : "#ef4444";
+  const q        = questions[current];
+  const progress = questions.length ? (current / TOTAL_Q) * 100 : 0;
+  const answered = selected !== null || timedOut;
+  const isCorrect = selected !== null && selected === q?.answer;
 
+  // ── Answer handler ────────────────────────────────────────────────────────
   const handleAnswer = (idx) => {
-    if (selected !== null || !q) return;
+    if (answered || !q) return;
     clearTimer();
     setSelected(idx);
     setShowExp(true);
-    if (idx === q.answer) {
-      setScore(s=>s+1);
+
+    const correct = idx === q.answer;
+    if (correct) {
+      setScore(s => s + 1);
+      if (passAndPlay) {
+        setPnpScores(s => { const ns = [...s]; ns[currentTurn] += 1; return ns; });
+      }
     } else {
-      const nl = lives-1;
-      setWrong(w=>w+1);
-      setLives(nl);
-      if (nl === 0) { setTimeout(()=>setPhase("gameover"),1600); return; }
+      setWrong(w => w + 1);
+      setLives(l => {
+        const next = l - 1;
+        if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
+        return next;
+      });
     }
   };
 
+  // ── Next handler ──────────────────────────────────────────────────────────
   const handleNext = () => {
-    const next = current+1;
+    const next = current + 1;
     if (next >= TOTAL_Q) { setPhase("result"); return; }
-    setCurrent(next); setSelected(null); setShowExp(false); setAnimKey(k=>k+1);
-    startTimer();
+
+    if (passAndPlay) {
+      const nxt = 1 - currentTurn;
+      setNextTurnIdx(nxt);
+      setShowHandoff(true);
+      return;
+    }
+
+    setCurrent(next);
+    setSelected(null);
+    setShowExp(false);
+    setAnimKey(k => k + 1);
+    resetTimer();
+  };
+
+  const continueAfterHandoff = () => {
+    setCurrentTurn(nextTurnIdx);
+    setCurrent(c => c + 1);
+    setSelected(null);
+    setShowExp(false);
+    setShowHandoff(false);
+    setAnimKey(k => k + 1);
+    resetTimer();
   };
 
   const restart = () => loadQuestions();
 
-  // ── Shared end page ──
-  const EndPage = ({ children }) => (
-    <div style={{ minHeight:"100vh", background:"#f5f0eb", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
-      <div style={{ background:"#fff", border:"1px solid #e8e2da", borderRadius:20, padding:"40px 28px", textAlign:"center", width:"100%", maxWidth:420 }}>
-        {children}
+  // ── Shared style helpers ──────────────────────────────────────────────────
+  const endPageWrap  = { minHeight: "100vh", background: "#F5F0EB", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" };
+  const endCardStyle = { background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "20px", padding: "40px 28px", textAlign: "center", width: "100%", maxWidth: "420px" };
+  const scoreCircle  = (c) => ({ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${c}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: "#FAFAF8" });
+  const btnPrimary   = (c) => ({ background: c, color: "#FFF", border: "none", borderRadius: "12px", padding: "13px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" });
+  const btnSecondary = { background: "#F5F0EB", color: "#4A4540", border: "1.5px solid #DDD7CE", borderRadius: "12px", padding: "13px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" };
+  const btnGroup     = { display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" };
+
+  // ── LOADING ───────────────────────────────────────────────────────────────
+  if (phase === "loading") return (
+    <div style={{ minHeight: "100vh", background: "#F5F0EB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ width: "44px", height: "44px", borderRadius: "50%", border: "4px solid #EDE8E1", borderTopColor: lvl.color, animation: "spin 0.85s linear infinite", marginBottom: "16px" }} />
+      <p style={{ color: lvl.color, fontWeight: "700", fontSize: "15px" }}>Loading {lvl.label} questions…</p>
+    </div>
+  );
+
+  // ── HANDOFF SCREEN (Pass & Play) ──────────────────────────────────────────
+  if (showHandoff) return (
+    <div style={{ minHeight: "100vh", background: nextTurnIdx === 0 ? "#2D1B69" : "#0C3D52", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ textAlign: "center", color: "#FFF" }}>
+        <span style={{ fontSize: "56px", display: "block", marginBottom: "16px" }}>
+          {nextTurnIdx === 0 ? "🟣" : "🔵"}
+        </span>
+        <h2 style={{ fontSize: "28px", fontWeight: "800", margin: "0 0 8px" }}>
+          {playerNames[nextTurnIdx]}'s Turn
+        </h2>
+        <p style={{ fontSize: "15px", opacity: 0.75, margin: "0 0 12px" }}>
+          Question {current + 2} of {TOTAL_Q}
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "32px", marginBottom: "32px" }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "28px", fontWeight: "800" }}>{pnpScores[i]}</div>
+              <div style={{ fontSize: "13px", opacity: 0.7 }}>{playerNames[i]}</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: "14px", opacity: 0.65, margin: "0 0 28px", maxWidth: "280px" }}>
+          Hand the device to <strong>{playerNames[nextTurnIdx]}</strong> and tap Ready!
+        </p>
+        <button onClick={continueAfterHandoff}
+          style={{ background: "#FFF", color: playerColors[nextTurnIdx], border: "none", borderRadius: "14px", padding: "14px 36px", fontSize: "16px", fontWeight: "800", cursor: "pointer" }}>
+          I'm Ready! →
+        </button>
       </div>
     </div>
   );
-  const ScoreCircle = ({ color }) => (
-    <div style={{ width:96, height:96, borderRadius:"50%", border:`4px solid ${color}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", background:"#fafaf8" }}>
-      <span style={{ fontSize:32, fontWeight:800, color, lineHeight:1 }}>{score}</span>
-      <span style={{ fontSize:12, color:"#a09890", fontWeight:600 }}>/ {TOTAL_Q}</span>
-    </div>
-  );
-  const BtnRow = ({ children }) => <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center" }}>{children}</div>;
-  const PBtn   = ({ color, onClick, children }) => <button onClick={onClick} style={{ background:color, color:"#fff", border:"none", borderRadius:12, padding:"13px 24px", fontSize:15, fontWeight:700, cursor:"pointer", flex:"1 1 auto", minWidth:120 }}>{children}</button>;
-  const SBtn   = ({ onClick, children }) => <button onClick={onClick} style={{ background:"#f5f0eb", color:"#4a4540", border:"1.5px solid #ddd7ce", borderRadius:12, padding:"13px 20px", fontSize:14, fontWeight:600, cursor:"pointer", flex:"1 1 auto", minWidth:120 }}>{children}</button>;
 
-  if (phase === "loading") return (
-    <div style={{ minHeight:"100vh", background:"#f5f0eb", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Segoe UI',sans-serif" }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ width:44, height:44, borderRadius:"50%", border:"4px solid #ede8e1", borderTopColor:lvl.color, animation:"spin 0.85s linear infinite", marginBottom:16 }} />
-      <p style={{ color:lvl.color, fontWeight:700, fontSize:15 }}>Loading {lvl.label} questions…</p>
-    </div>
-  );
-
+  // ── GAME OVER ─────────────────────────────────────────────────────────────
   if (phase === "gameover") return (
-    <EndPage>
-      <div style={{ fontSize:52, marginBottom:16 }}>💔</div>
-      <h2 style={{ fontSize:24, fontWeight:800, color:"#dc2626", marginBottom:8 }}>Out of Lives!</h2>
-      <ScoreCircle color="#dc2626" />
-      <p style={{ fontSize:14, color:"#7a7268", lineHeight:1.6, marginBottom:24 }}>You scored <strong>{score}/{TOTAL_Q}</strong>. Need at least {PASS_SCORE} to pass.</p>
-      <BtnRow><PBtn color={lvl.color} onClick={restart}>↺ Restart</PBtn><SBtn onClick={()=>{clearTimer();navigate(`/games/${gameId}/level/${langId}`);}}>← Change Level</SBtn></BtnRow>
-    </EndPage>
+    <div style={endPageWrap}>
+      <div style={endCardStyle}>
+        <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>💔</span>
+        <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#DC2626", marginBottom: "8px" }}>Out of Lives!</h2>
+        <div style={scoreCircle("#DC2626")}>
+          <span style={{ fontSize: "32px", fontWeight: "800", color: "#DC2626", lineHeight: 1 }}>{score}</span>
+          <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
+        </div>
+        <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "20px" }}>
+          You need at least {PASS_SCORE} correct answers to pass.
+        </p>
+        <div style={btnGroup}>
+          <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Restart</button>
+          <button style={btnSecondary} onClick={() => navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${langId}`)}>← Back</button>
+        </div>
+      </div>
+    </div>
   );
 
+  // ── RESULT ────────────────────────────────────────────────────────────────
   if (phase === "result") {
-    const passed = score >= PASS_SCORE;
-    const color  = passed ? lvl.color : "#dc2626";
-    const next   = level==="easy" ? "medium" : level==="medium" ? "hard" : null;
+    if (passAndPlay) {
+      const tied   = pnpScores[0] === pnpScores[1];
+      const winner = tied ? -1 : pnpScores[0] > pnpScores[1] ? 0 : 1;
+      return (
+        <div style={endPageWrap}>
+          <div style={endCardStyle}>
+            <span style={{ fontSize: "52px", display: "block", marginBottom: "16px" }}>{tied ? "🤝" : "🏆"}</span>
+            <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#1C1814", margin: "0 0 8px" }}>
+              {tied ? "It's a Tie!" : `${playerNames[winner]} Wins!`}
+            </h2>
+            <p style={{ fontSize: "14px", color: "#7A7268", marginBottom: "24px" }}>
+              {tied ? "Both players spotted the same number of bugs!" : `${playerNames[winner]} caught more bugs!`}
+            </p>
+            <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
+              {[0, 1].map(i => (
+                <div key={i} style={{ flex: 1, background: winner === i ? "#F3F0FF" : "#FAFAF8", border: `2px solid ${winner === i ? playerColors[i] : "#E8E2DA"}`, borderRadius: "14px", padding: "16px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: playerColors[i], textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+                    {winner === i ? "🥇 " : ""}{playerNames[i]}
+                  </div>
+                  <div style={{ fontSize: "36px", fontWeight: "800", color: playerColors[i], lineHeight: 1 }}>{pnpScores[i]}</div>
+                  <div style={{ fontSize: "12px", color: "#9C9489", marginTop: "4px" }}>/ {TOTAL_Q}</div>
+                </div>
+              ))}
+            </div>
+            <div style={btnGroup}>
+              <button style={btnPrimary("#7C3AED")} onClick={restart}>↺ Play Again</button>
+              <button style={btnSecondary} onClick={() => navigate("/pass-and-play")}>← Change Game</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const passed    = score >= PASS_SCORE;
+    const rc        = passed ? lvl.color : "#DC2626";
+    const nextLevel = level === "easy" ? "medium" : level === "medium" ? "hard" : null;
     return (
-      <EndPage>
-        <div style={{ fontSize:52, marginBottom:16 }}>{passed?"🏆":"😔"}</div>
-        <h2 style={{ fontSize:24, fontWeight:800, color, marginBottom:8 }}>{passed?"Level Complete!":"Not Quite!"}</h2>
-        <ScoreCircle color={color} />
-        <p style={{ fontSize:14, color:"#7a7268", lineHeight:1.6, marginBottom:8 }}>{passed?`Great job! ${score}/${TOTAL_Q} correct.`:`Need at least ${PASS_SCORE}/10 to pass.`}</p>
-        <span style={{ fontSize:13, color:"#9c9489", display:"block", marginBottom:24 }}>Lives left: {"❤️".repeat(lives)}{"🖤".repeat(Math.max(0,lvl.lives-lives))}</span>
-        <BtnRow>
-          {!passed && <PBtn color={lvl.color} onClick={restart}>↺ Try Again</PBtn>}
-          {passed && next && <PBtn color={lvl.color} onClick={()=>navigate(`/games/${gameId}/play/${langId}/${next}`)}>Next Level →</PBtn>}
-          {passed && !next && <PBtn color="#7c3aed" onClick={()=>navigate("/games")}>🎯 All Games</PBtn>}
-          <SBtn onClick={()=>{clearTimer();navigate(`/games/${gameId}/level/${langId}`);}}>← Change Level</SBtn>
-        </BtnRow>
-      </EndPage>
+      <div style={endPageWrap}>
+        <div style={endCardStyle}>
+          <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>{passed ? "🏆" : "😔"}</span>
+          <h2 style={{ fontSize: "24px", fontWeight: "800", color: rc, marginBottom: "8px" }}>{passed ? "Level Complete!" : "Not Quite!"}</h2>
+          <div style={scoreCircle(rc)}>
+            <span style={{ fontSize: "32px", fontWeight: "800", color: rc, lineHeight: 1 }}>{score}</span>
+            <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
+          </div>
+          <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "8px" }}>
+            {passed ? `Excellent! You got ${score} out of ${TOTAL_Q} correct.` : `You need ${PASS_SCORE}/10 to pass. Keep practicing!`}
+          </p>
+          <span style={{ fontSize: "13px", color: "#9C9489", marginBottom: "28px", display: "block" }}>
+            Lives remaining: {"❤️".repeat(lives)}{"🖤".repeat(Math.max(0, lvl.lives - lives))}
+          </span>
+          <div style={btnGroup}>
+            {!passed && <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Try Again</button>}
+            {passed && nextLevel && <button style={btnPrimary(lvl.color)} onClick={() => navigate(`/games/${gameId}/play/${langId}/${nextLevel}`)}>Next Level →</button>}
+            {passed && !nextLevel && <button style={btnPrimary("#7C3AED")} onClick={() => navigate("/games")}>🎯 All Games</button>}
+            <button style={btnSecondary} onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</button>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // ── QUIZ ──
+  // ── QUIZ ──────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        @keyframes spin    { to { transform:rotate(360deg); } }
-        @keyframes slideQ  { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes fadeExp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-        .q-enter   { animation: slideQ  0.3s cubic-bezier(.22,.68,0,1.2) both; }
-        .exp-enter { animation: fadeExp 0.22s ease both; }
-        .timer-urgent { animation: pulse 0.6s ease infinite; }
-        .opt-btn { transition:transform 0.12s,border-color 0.12s,background 0.12s; cursor:pointer; border:none; text-align:left; font-family:inherit; }
-        .opt-btn:hover:not(:disabled) { transform:translateX(4px); }
-        .opt-btn:disabled { cursor:default; }
-        .exit-btn:hover { background:#ede8e1 !important; }
-        .next-btn:hover { opacity:0.88; }
-        .next-btn:active { transform:scale(0.97); }
-
-        /* Responsive */
-        .quiz-root { min-height:100vh; background:#f5f0eb; font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; }
-        .quiz-wrap { flex:1; width:100%; max-width:700px; margin:0 auto; padding:18px 16px 48px; box-sizing:border-box; }
-        .topbar    { background:#fff; border-bottom:1px solid #e8e2da; padding:10px 16px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10; }
-        .code-pre  { font-size:13px; line-height:1.75; }
-
-        @media (max-width:540px) {
-          .quiz-wrap { padding:12px 10px 40px; }
-          .code-pre  { font-size:11px; }
-          .opt-text  { font-size:13px !important; }
+        @keyframes spin        { to { transform: rotate(360deg); } }
+        @keyframes slideQ      { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes fadeExp     { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes urgentPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.13)} }
+        @keyframes timedOutShake {
+          0%,100%{transform:translateX(0)}
+          20%{transform:translateX(-5px)} 40%{transform:translateX(5px)}
+          60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
         }
-        @media (max-width:380px) {
-          .code-pre { font-size:10px; }
+        .q-enter   { animation: slideQ  0.32s cubic-bezier(.22,.68,0,1.2) both; }
+        .exp-enter { animation: fadeExp 0.24s ease both; }
+        .timed-out-shake { animation: timedOutShake 0.45s ease both; }
+
+        /* Responsive layout */
+        .tte-container {
+          flex: 1;
+          width: 100%;
+          max-width: 700px;
+          margin: 0 auto;
+          padding: 20px 16px 48px;
+          box-sizing: border-box;
+        }
+        .tte-topbar {
+          background: #FFF;
+          border-bottom: 1px solid #E8E2DA;
+          padding: 10px 20px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        .tte-score-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr 1fr;
+          background: #FFF;
+          border: 1px solid #E8E2DA;
+          border-radius: 14px;
+          overflow: hidden;
+          margin-bottom: 18px;
+        }
+        .tte-score-cell {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 10px 6px;
+          gap: 2px;
+        }
+        .tte-code-pre {
+          margin: 0;
+          font-size: 13px;
+          font-family: 'Fira Code','Cascadia Code','Consolas',monospace;
+          color: #E2E8F0;
+          overflow-x: auto;
+          line-height: 1.75;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .tte-opt-btn {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+          transition: transform 0.15s, border-color 0.15s, background 0.15s;
+        }
+        .tte-opt-btn:hover:not(:disabled) {
+          transform: translateX(4px);
+        }
+        .tte-opt-text { font-size: 14px; font-weight: 500; line-height: 1.5; flex: 1; }
+        .tte-next-btn { transition: opacity 0.15s, transform 0.1s; }
+        .tte-next-btn:hover { opacity: 0.88; }
+        .tte-next-btn:active { transform: scale(0.97); }
+        .tte-exit-btn:hover { background: #EDE8E1 !important; }
+
+        @media (max-width: 480px) {
+          .tte-topbar { padding: 8px 12px; gap: 8px; }
+          .tte-container { padding: 12px 10px 40px; }
+          .tte-score-grid { grid-template-columns: 1fr 1fr; }
+          .tte-score-cell { padding: 8px 4px; }
+          .tte-score-num { font-size: 16px !important; }
+          .tte-score-lbl { font-size: 9px !important; }
+          .tte-code-pre { font-size: 11px !important; }
+          .tte-opt-text { font-size: 13px !important; }
+          .tte-meta-row { flex-direction: column; gap: 4px; }
+          .tte-opt-btn { padding: 10px 12px; }
+        }
+        @media (max-width: 360px) {
+          .tte-code-pre { font-size: 10px !important; }
+          .tte-opt-text { font-size: 12px !important; }
         }
       `}</style>
 
-      <div className="quiz-root">
+      <div style={{ minHeight: "100vh", background: "#F5F0EB", fontFamily: "'Segoe UI','Inter',system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
 
         {/* TOP BAR */}
-        <div className="topbar">
-          <button className="exit-btn" onClick={()=>{clearTimer();navigate(`/games/${gameId}/level/${langId}`);}}
-            style={{ width:32, height:32, borderRadius:"50%", border:"1.5px solid #e0d8cf", background:"#f5f0eb", cursor:"pointer", fontSize:14, color:"#6b6560", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>✕</button>
-
-          {/* Progress */}
-          <div style={{ flex:1, height:7, background:"#ede8e1", borderRadius:999, overflow:"hidden" }}>
-            <div style={{ height:"100%", background:lvl.color, borderRadius:999, width:`${progress}%`, transition:"width 0.45s ease" }} />
+        <div className="tte-topbar">
+          <button
+            className="tte-exit-btn"
+            onClick={() => { clearTimer(); navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${langId}`); }}
+            style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid #E0D8CF", background: "#F5F0EB", cursor: "pointer", fontSize: "15px", color: "#6B6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
+            ✕
+          </button>
+          <div style={{ flex: 1, height: "8px", background: "#EDE8E1", borderRadius: "999px", overflow: "hidden" }}>
+            <div style={{ height: "100%", background: passAndPlay ? playerColors[currentTurn] : lvl.color, borderRadius: "999px", width: `${progress}%`, transition: "width 0.45s ease" }} />
           </div>
-
-          {/* Timer */}
-          <div className={timeLeft<=5?"timer-urgent":""} style={{ display:"flex", alignItems:"center", gap:5, background:timerColor+"18", border:`1.5px solid ${timerColor}44`, borderRadius:999, padding:"4px 10px", flexShrink:0 }}>
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="7" fill="none" stroke="#ede8e1" strokeWidth="2.5" />
-              <circle cx="9" cy="9" r="7" fill="none" stroke={timerColor} strokeWidth="2.5"
-                strokeDasharray={`${2*Math.PI*7}`}
-                strokeDashoffset={`${2*Math.PI*7*(1-timerPct)}`}
-                strokeLinecap="round"
-                transform="rotate(-90 9 9)"
-                style={{ transition:"stroke-dashoffset 1s linear, stroke 0.3s" }}
-              />
-            </svg>
-            <span style={{ fontSize:13, fontWeight:800, color:timerColor, fontVariantNumeric:"tabular-nums", minWidth:18 }}>{timeLeft}s</span>
-          </div>
-
-          {/* Lives */}
-          <div style={{ display:"flex", gap:2, flexShrink:0 }}>
-            {Array.from({length:lvl.lives}).map((_,i) => (
-              <span key={i} style={{ fontSize:16, opacity: i<lives ? 1 : 0.22 }}>❤️</span>
+          <TimerRing timeLeft={timeLeft} timeLimit={lvl.timeLimit} color={passAndPlay ? playerColors[currentTurn] : lvl.color} />
+          <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+            {Array.from({ length: lvl.lives }).map((_, i) => (
+              <span key={i} style={{ fontSize: "18px", opacity: i < lives ? 1 : 0.22, lineHeight: 1 }}>❤️</span>
             ))}
           </div>
         </div>
 
         {/* CONTENT */}
-        <div className="quiz-wrap">
+        <div className="tte-container">
 
-          {/* Meta */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:"#0891b2" }}>🐛 {lang} · {lvl.label}</span>
-            <span style={{ fontSize:13, color:"#9c9489", fontWeight:600, background:"#ede8e1", padding:"3px 10px", borderRadius:999 }}>{current+1} / {TOTAL_Q}</span>
+          {/* Meta row */}
+          <div className="tte-meta-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "6px" }}>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#0891b2" }}>
+              🐛 Trace the Error • {lang} • {lvl.label}
+            </span>
+            <span style={{ fontSize: "13px", color: "#9C9489", fontWeight: "600", background: "#EDE8E1", padding: "4px 10px", borderRadius: "999px" }}>
+              {current + 1}/{TOTAL_Q}
+            </span>
           </div>
 
+          {/* Pass & Play turn banner */}
+          {passAndPlay && (
+            <TurnBanner
+              currentTurn={currentTurn}
+              playerNames={playerNames}
+              scores={pnpScores}
+              colors={playerColors}
+            />
+          )}
+
           {/* Score band */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", background:"#fff", border:"1px solid #e8e2da", borderRadius:14, overflow:"hidden", marginBottom:16 }}>
-            {[{num:score,lbl:"Correct",color:"#16a34a"},{num:wrong,lbl:"Wrong",color:"#dc2626"},{num:PASS_SCORE,lbl:"To Pass",color:"#d97706"}].map((s,i)=>(
-              <div key={s.lbl} style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 6px", gap:2, borderRight:i<2?"1px solid #ede8e1":"none" }}>
-                <span style={{ fontSize:18, fontWeight:700, lineHeight:1, color:s.color }}>{s.num}</span>
-                <span style={{ fontSize:10, color:"#a09890", fontWeight:600, letterSpacing:"0.5px", textTransform:"uppercase" }}>{s.lbl}</span>
+          <div className="tte-score-grid">
+            {[
+              { num: passAndPlay ? pnpScores[0] : score, lbl: passAndPlay ? (playerNames[0].split(" ")[0] || "P1") : "Correct", color: "#16A34A" },
+              { num: passAndPlay ? pnpScores[1] : wrong,  lbl: passAndPlay ? (playerNames[1].split(" ")[0] || "P2") : "Wrong",   color: passAndPlay ? "#0891b2" : "#DC2626" },
+              { num: PASS_SCORE,                          lbl: "To Pass",  color: "#D97706" },
+              { num: `${lvl.timeLimit}s`,                 lbl: "Per Q",    color: "#6366F1" },
+            ].map((s, i, arr) => (
+              <div key={s.lbl} className="tte-score-cell" style={{ borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
+                <span className="tte-score-num" style={{ fontSize: "18px", fontWeight: "700", lineHeight: 1, color: s.color }}>{s.num}</span>
+                <span className="tte-score-lbl" style={{ fontSize: "10px", color: "#A09890", fontWeight: "600", letterSpacing: "0.6px", textTransform: "uppercase" }}>{s.lbl}</span>
               </div>
             ))}
           </div>
 
-          {/* Question */}
+          {/* Question area */}
           <div key={animKey} className="q-enter">
 
-            <span style={{ fontSize:11, fontWeight:700, letterSpacing:1, color:"#a09890", textTransform:"uppercase", display:"block", marginBottom:10 }}>
-              Find the error in this code:
-            </span>
-
-            {/* Timeout banner */}
-            {isTimeout && (
-              <div className="exp-enter" style={{ background:"#fef2f2", border:"1.5px solid #fecaca", borderRadius:10, padding:"10px 14px", fontSize:13, color:"#991b1b", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:16 }}>⏰</span>
-                <span><strong>Time's up!</strong> The error was: <code style={{ background:"#dcfce7", color:"#166534", padding:"1px 6px", borderRadius:4, fontFamily:"monospace" }}>{q?.error}</code></span>
+            {/* Timed-out banner */}
+            {timedOut && (
+              <div className="exp-enter timed-out-shake" style={{ background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: "12px", padding: "11px 16px", fontSize: "14px", color: "#92400E", marginBottom: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "20px" }}>⏰</span>
+                <span>Time's up! The error was:&nbsp;
+                  <span style={{ background: "#FDE68A", padding: "2px 8px", borderRadius: "6px", fontWeight: "800" }}>
+                    {q?.error}
+                  </span>
+                </span>
               </div>
             )}
 
+            <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: "#A09890", textTransform: "uppercase", display: "block", marginBottom: "10px" }}>
+              Find the error in this code:
+            </span>
+
             {/* Code block */}
-            <div style={{ background:"#1e1b2e", borderRadius:14, padding:16, marginBottom:12, overflow:"auto" }}>
-              <div style={{ display:"flex", gap:6, marginBottom:12, alignItems:"center" }}>
-                {["#ff5f57","#febc2e","#28c840"].map((c,i)=>(
-                  <div key={i} style={{ width:10, height:10, borderRadius:"50%", background:c }} />
+            <div style={{ background: "#1E1B2E", borderRadius: "14px", padding: "16px", marginBottom: "14px", overflow: "auto" }}>
+              <div style={{ display: "flex", gap: "6px", marginBottom: "12px", alignItems: "center" }}>
+                {["#FF5F57", "#FEBC2E", "#28C840"].map((c, i) => (
+                  <div key={i} style={{ width: "10px", height: "10px", borderRadius: "50%", background: c }} />
                 ))}
-                <span style={{ marginLeft:"auto", fontSize:11, color:"rgba(255,255,255,0.3)", fontFamily:"monospace" }}>{langId}</span>
+                <span style={{ marginLeft: "auto", fontSize: "11px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>{bankKey}</span>
               </div>
-              <pre className="code-pre" style={{ margin:0, fontFamily:"'Fira Code','Cascadia Code','Consolas',monospace", color:"#e2e8f0", overflowX:"auto", whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
+              <pre className="tte-code-pre">
                 <code>{q?.code}</code>
               </pre>
             </div>
 
-            <p style={{ fontSize:14, fontWeight:600, color:"#374151", marginBottom:12 }}>❓ What is the error?</p>
+            <p style={{ fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "12px" }}>
+              ❓ What is the error?
+            </p>
 
-            {/* Options */}
-            <div style={{ display:"flex", flexDirection:"column", gap:9, marginBottom:12 }}>
-              {q?.options?.map((opt,i) => {
-                const isAns = i===q.answer, isSel = i===selected;
-                let bg="#fff", border="#e8e2da", txtClr="#1c1814", letBg="#f5f0eb", letClr="#6b6560";
-                if (selected!==null) {
-                  if (isAns)      { bg="#f0fdf4"; border="#86efac"; txtClr="#166534"; letBg="#dcfce7"; letClr="#15803d"; }
-                  else if (isSel) { bg="#fef2f2"; border="#fecaca"; txtClr="#991b1b"; letBg="#fee2e2"; letClr="#b91c1c"; }
-                  else            { bg="#fafaf8"; border="#ede8e1"; txtClr="#c0b8b0"; letClr="#c0b8b0"; }
+            {/* Choices */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "9px", marginBottom: "14px" }}>
+              {q?.options?.map((opt, i) => {
+                const isAns = i === q.answer, isSel = i === selected;
+                let bg = "#FFF", border = "#E8E2DA", txtClr = "#1C1814";
+                let letBg = "#F5F0EB", letClr = "#6B6560", letBorder = "#DDD7CE";
+                if (answered) {
+                  if (isAns)      { bg = "#F0FDF4"; border = "#86EFAC"; txtClr = "#166534"; letBg = "#DCFCE7"; letClr = "#15803D"; letBorder = "#86EFAC"; }
+                  else if (isSel) { bg = "#FEF2F2"; border = "#FECACA"; txtClr = "#991B1B"; letBg = "#FEE2E2"; letClr = "#B91C1C"; letBorder = "#FECACA"; }
+                  else            { bg = "#FAFAF8"; border = "#EDE8E1"; txtClr = "#C0B8B0"; letClr = "#C0B8B0"; }
                 }
                 return (
-                  <button key={i} className="opt-btn" disabled={selected!==null} onClick={()=>handleAnswer(i)}
-                    style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"12px 14px", background:bg, border:`1.5px solid ${border}`, borderRadius:12, width:"100%" }}>
-                    <span style={{ width:28, height:28, borderRadius:"50%", border:`1.5px solid ${border}`, background:letBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:letClr, flexShrink:0, marginTop:1 }}>
+                  <button
+                    key={i}
+                    className="tte-opt-btn"
+                    disabled={answered}
+                    onClick={() => handleAnswer(i)}
+                    style={{ background: bg, border: `1.5px solid ${border}` }}
+                  >
+                    <span style={{ width: "28px", height: "28px", borderRadius: "50%", border: `1.5px solid ${letBorder}`, background: letBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "700", color: letClr, flexShrink: 0, fontFamily: "monospace", marginTop: "1px" }}>
                       {LETTERS[i]}
                     </span>
-                    <span className="opt-text" style={{ flex:1, fontSize:14, fontWeight:500, color:txtClr, lineHeight:1.5 }}>{opt}</span>
-                    {selected!==null && isAns && <span style={{ fontSize:16, flexShrink:0 }}>✅</span>}
-                    {selected!==null && isSel && !isAns && <span style={{ fontSize:16, flexShrink:0 }}>❌</span>}
+                    <span className="tte-opt-text" style={{ color: txtClr }}>
+                      {opt}
+                    </span>
+                    {answered && isAns && <span style={{ fontSize: "16px", flexShrink: 0 }}>✅</span>}
+                    {answered && isSel && !isAns && <span style={{ fontSize: "16px", flexShrink: 0 }}>❌</span>}
                   </button>
                 );
               })}
             </div>
 
             {/* Explanation */}
-            {showExp && q?.explanation && !isTimeout && (
-              <div className="exp-enter" style={{ background:isCorrect?"#f0fdf4":"#fef2f2", border:`1.5px solid ${isCorrect?"#86efac":"#fecaca"}`, borderRadius:12, padding:"13px 15px", fontSize:14, color:isCorrect?"#166534":"#991b1b", lineHeight:1.6, marginBottom:12 }}>
-                <span style={{ fontWeight:700, display:"block", marginBottom:4, fontSize:13, color:isCorrect?"#15803d":"#b91c1c" }}>
-                  {isCorrect?"✅ Correct!":"❌ Incorrect!"}
-                  {!isCorrect && <span style={{ color:"#15803d", marginLeft:8 }}>Error: <code style={{ background:"#dcfce7", padding:"1px 6px", borderRadius:4, fontFamily:"monospace" }}>{q.error}</code></span>}
+            {showExp && !timedOut && q?.explanation && (
+              <div className="exp-enter" style={{ background: isCorrect ? "#F0FDF4" : "#FEF2F2", border: `1.5px solid ${isCorrect ? "#86EFAC" : "#FECACA"}`, borderRadius: "12px", padding: "14px 16px", fontSize: "14px", color: isCorrect ? "#166534" : "#991B1B", lineHeight: 1.6, marginBottom: "14px" }}>
+                <span style={{ fontWeight: "700", display: "block", marginBottom: "4px", fontSize: "13px" }}>
+                  {isCorrect ? "✅ Correct!" : "❌ Incorrect!"}
+                  {!isCorrect && (
+                    <span style={{ color: "#15803D", marginLeft: "8px" }}>
+                      Error: <code style={{ fontFamily: "monospace", background: "#DCFCE7", padding: "1px 6px", borderRadius: "4px" }}>{q.error}</code>
+                    </span>
+                  )}
                 </span>
                 {q.explanation}
               </div>
             )}
 
-            {/* Next */}
-            {selected!==null && (
-              <div className="exp-enter" style={{ display:"flex", justifyContent:"flex-end" }}>
-                <button className="next-btn" onClick={handleNext}
-                  style={{ background:lvl.color, color:"#fff", border:"none", borderRadius:12, padding:"11px 22px", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6, boxShadow:`0 4px 14px ${lvl.color}55`, transition:"opacity 0.15s, transform 0.1s" }}>
-                  {current+1>=TOTAL_Q?"See Result":"Next"} →
+            {/* Next button */}
+            {answered && (
+              <div className="exp-enter" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className="tte-next-btn"
+                  onClick={handleNext}
+                  style={{ background: passAndPlay ? playerColors[currentTurn] : lvl.color, color: "#FFF", border: "none", borderRadius: "12px", padding: "12px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
+                >
+                  {current + 1 >= TOTAL_Q ? "See Result" : passAndPlay ? `Pass to ${playerNames[1 - currentTurn]} →` : "Next →"}
                 </button>
               </div>
             )}

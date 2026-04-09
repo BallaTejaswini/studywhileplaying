@@ -19,6 +19,7 @@ import PassAndPlay from "./pages/PassAndPlay";
 import VsComputer from "./pages/VsComputer";
 import ShortenTheSyntax from "./pages/ShortenTheSyntax";
 import GuessOutputGame from "./pages/GuessOuputGame";
+import PageNotFound from "./pages/PageNotFound";
 
 
 
@@ -36,6 +37,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path='*' element={<PageNotFound/>}/>
         <Route path="/" element={<Navigate to="/signup" />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={!user ? <SignIn /> : <Navigate to="/home" />} />
@@ -52,8 +54,6 @@ function App() {
         <Route path="/vs-computer" element={user ? <VsComputer /> : <Navigate to="/home" />} />
         <Route path="/games/:gameId/level/:langId" element={user ? <ShortenTheSyntax/> : <Navigate to="/home" />} />
         <Route path="/games/:gameId/play/:langId/:level" element={user ? <GuessOutputGame /> : <Navigate to="/home" />} />
-        
-        
       </Routes>
     </BrowserRouter>
   );

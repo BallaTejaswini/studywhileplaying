@@ -1,6 +1,11 @@
-import { useNavigate, useParams } from "react-router-dom";
+// import { useNavigate, useParams, useLocation } from "react-router-dom";
+// import { useAuth } from "../context/AuthContext";
+// import { useState, useEffect, useCallback, useRef } from "react";
+// import { updateGameStats } from "../utils/UpdateGameStats";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback,useRef } from "react";
+import { updateGameStats } from "../utils/UpdateGameStats";
 
 const QUESTION_BANK = {
   python: {
@@ -271,18 +276,24 @@ const QUESTION_BANK = {
   },
 };
 
-const languageLabels = { python: "Python", c: "C", cpp: "C++", java: "Java", sql: "SQL", webdev: "Web Dev", dsa: "DSA" };
+// ─── Config ───────────────────────────────────────────────────────────────────
+const languageLabels = {
+  python: "Python", c: "C", cpp: "C++",
+  java: "Java", sql: "SQL", web: "Web Dev",
+  webdev: "Web Dev", dsa: "DSA",
+};
 
-// Timer config per level (seconds per question)
 const levelConfig = {
-  easy:   { label: "EASY",   color: "#22c55e", lives: 3, timePerQ: 30 },
-  medium: { label: "MEDIUM", color: "#f59e0b", lives: 3, timePerQ: 20 },
-  hard:   { label: "HARD",   color: "#ef4444", lives: 3, timePerQ: 15 },
+  easy:   { label: "Easy",   color: "#7C3AED", lives: 3, timeLimit: 30 },
+  medium: { label: "Medium", color: "#D97706", lives: 3, timeLimit: 20 },
+  hard:   { label: "Hard",   color: "#DC2626", lives: 3, timeLimit: 15 },
 };
 
 const TOTAL_Q    = 10;
 const PASS_SCORE = 8;
+const LETTERS    = ["A", "B", "C", "D"];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -309,150 +320,264 @@ Return ONLY valid JSON array, no markdown:
   return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
+// ── Timer Ring ────────────────────────────────────────────────────────────────
+const TimerRing = ({ timeLeft, timeLimit, color }) => {
+  const R             = 16;
+  const circumference = 2 * Math.PI * R;
+  const pct           = timeLeft / timeLimit;
+  const dashOffset    = circumference * (1 - pct);
+  const ringColor     = pct > 0.5 ? color : pct > 0.25 ? "#D97706" : "#DC2626";
+  const isUrgent      = timeLeft <= 5 && timeLeft > 0;
+
+  return (
+    <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
+      <svg width="44" height="44" viewBox="0 0 44 44"
+        style={{ transform: "rotate(-90deg)", animation: isUrgent ? "urgentPulse 0.55s ease-in-out infinite" : "none" }}>
+        <circle cx="22" cy="22" r={R} fill="none" stroke="#EDE8E1" strokeWidth="3.5" />
+        <circle cx="22" cy="22" r={R} fill="none" stroke={ringColor} strokeWidth="3.5"
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset}
+          style={{ transition: "stroke-dashoffset 0.92s linear, stroke 0.3s ease" }} />
+      </svg>
+      <span style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "center",
+        justifyContent: "center", fontSize: "13px", fontWeight: "800",
+        color: ringColor, lineHeight: 1, transition: "color 0.3s ease",
+      }}>
+        {timeLeft}
+      </span>
+    </div>
+  );
+};
+
+// ── Pass & Play Turn Banner ───────────────────────────────────────────────────
+const TurnBanner = ({ currentTurn, playerNames, scores, colors }) => (
+  <div style={{
+    background: colors[currentTurn],
+    borderRadius: "12px",
+    padding: "10px 16px",
+    marginBottom: "14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <span style={{ fontSize: "20px" }}>{currentTurn === 0 ? "🟣" : "🔵"}</span>
+      <div>
+        <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
+          {playerNames[currentTurn]}'s Turn
+        </div>
+        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)" }}>
+          Pass &amp; Play Mode
+        </div>
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: "16px" }}>
+      {[0, 1].map(i => (
+        <div key={i} style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: currentTurn === i ? "#fff" : "rgba(255,255,255,0.5)" }}>
+            {scores[i]}
+          </div>
+          <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {playerNames[i]}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const GuessSyntax = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { gameId, langId, level } = useParams();
-  const { user } = useAuth();
+  const { user }  = useAuth();
 
-  const lang = languageLabels[langId] ?? langId;
+  // Normalize langId so "web" maps to "webdev" in the question bank
+  const normalizedLangId = langId === "web" ? "webdev" : langId?.toLowerCase();
+
+  // ── Pass & Play state ──────────────────────────────────────────────────────
+  const { passAndPlay, player1, player2 } = location.state || {};
+  const playerNames  = [player1 || "Player 1", player2 || "Player 2"];
+  const playerColors = ["#7C3AED", "#0891b2"];
+  const [pnpScores,   setPnpScores]   = useState([0, 0]);
+  const [currentTurn, setCurrentTurn] = useState(0);
+  const [showHandoff, setShowHandoff] = useState(false);
+  const [nextTurnIdx, setNextTurnIdx] = useState(1);
+
+  const lang = languageLabels[langId] ?? languageLabels[normalizedLangId] ?? langId;
   const lvl  = levelConfig[level] ?? levelConfig.easy;
 
-  const [phase,    setPhase]    = useState("loading");
-  const [questions,setQuestions]= useState([]);
-  const [current,  setCurrent]  = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [lives,    setLives]    = useState(lvl.lives);
-  const [score,    setScore]    = useState(0);
-  const [wrong,    setWrong]    = useState(0);
-  const [showExp,  setShowExp]  = useState(false);
-  const [animKey,  setAnimKey]  = useState(0);
-  const [showHint, setShowHint] = useState(false);
+  // ── Core quiz state ───────────────────────────────────────────────────────
+  const [phase,     setPhase]     = useState("loading");
+  const [questions, setQuestions] = useState([]);
+  const [current,   setCurrent]   = useState(0);
+  const [selected,  setSelected]  = useState(null);
+  const [lives,     setLives]     = useState(lvl.lives);
+  const [score,     setScore]     = useState(0);
+  const [wrong,     setWrong]     = useState(0);
+  const [showExp,   setShowExp]   = useState(false);
+  const [animKey,   setAnimKey]   = useState(0);
+  const [showHint,  setShowHint]  = useState(false);
+  const [timeLeft,  setTimeLeft]  = useState(lvl.timeLimit);
+  const [timedOut,  setTimedOut]  = useState(false);
+  const timerRef = useRef(null);
 
-  // ── Timer state ──
-  const [timeLeft, setTimeLeft] = useState(lvl.timePerQ);
-  const timerRef  = useRef(null);
-
-  const clearTimer = () => { if (timerRef.current) clearInterval(timerRef.current); };
-
-  const startTimer = useCallback(() => {
-    clearTimer();
-    setTimeLeft(lvl.timePerQ);
-    timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) {
-          clearInterval(timerRef.current);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-  }, [lvl.timePerQ]);
-
-  // When timer hits 0 — auto-submit wrong
-  useEffect(() => {
-    if (timeLeft === 0 && phase === "quiz" && selected === null) {
-      handleTimeout();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
-
-  const handleTimeout = () => {
-    clearTimer();
-    const q = questions[current];
-    if (!q) return;
-    setSelected("__TIMEOUT__");
-    setShowExp(true);
-    const newLives = lives - 1;
-    setWrong(w => w + 1);
-    setLives(newLives);
-    if (newLives === 0) {
-      setTimeout(() => setPhase("gameover"), 1800);
-    }
+  const clearTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
+  const resetTimer = useCallback(() => {
+    clearTimer();
+    setTimeLeft(lvl.timeLimit);
+    setTimedOut(false);
+  }, [lvl.timeLimit]);
+
+  // ── Save stats when game ends ─────────────────────────────────────────────
+  useEffect(() => {
+    if ((phase === "result" || phase === "gameover") && user && !passAndPlay) {
+      updateGameStats({
+        userId: user.uid,
+        gameId,
+        langId,
+        level,
+        score,
+        total: TOTAL_Q,
+        passed: score >= PASS_SCORE,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // ── Timer tick ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "quiz" || selected !== null || timedOut || showHandoff) return;
+    clearTimer();
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearTimer();
+          setTimedOut(true);
+          setShowExp(true);
+          setWrong(w => w + 1);
+          setLives(l => {
+            const next = l - 1;
+            if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
+            return Math.max(next, 0);
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return clearTimer;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, selected, timedOut, current, showHandoff]);
+
+  useEffect(() => { if (selected !== null) clearTimer(); }, [selected]);
+  useEffect(() => () => clearTimer(), []);
+
+  // ── Load questions ────────────────────────────────────────────────────────
   const loadQuestions = useCallback(async () => {
     setPhase("loading");
     clearTimer();
-    const bankKey = langId?.toLowerCase();
-    const bank    = QUESTION_BANK[bankKey]?.[level];
+    const bank    = QUESTION_BANK[normalizedLangId]?.[level];
+    const makeSet = (raw) =>
+      shuffle(raw && raw.length ? raw : []).slice(0, TOTAL_Q)
+        .map(q => ({ ...q, choices: shuffle(q.choices) }));
 
-    if (bank && bank.length >= TOTAL_Q) {
-      setQuestions(shuffle(bank).slice(0, TOTAL_Q).map(q => ({ ...q, choices: shuffle(q.choices) })));
-    } else {
-      try {
-        const qs = await fetchFromAPI(lang, level);
-        setQuestions(qs.slice(0, TOTAL_Q).map(q => ({ ...q, choices: shuffle(q.choices) })));
-      } catch {
-        setQuestions(shuffle(bank ?? []).slice(0, TOTAL_Q).map(q => ({ ...q, choices: shuffle(q.choices) })));
-      }
+    let raw = bank && bank.length >= TOTAL_Q ? bank : null;
+    if (!raw) {
+      try { raw = await fetchFromAPI(lang, level); } catch { raw = bank ?? []; }
     }
-
-    setCurrent(0); setSelected(null); setShowExp(false);
+    setQuestions(makeSet(raw));
+    setCurrent(0); setSelected(null); setShowExp(false); setShowHint(false);
+    setTimedOut(false);
     setLives(lvl.lives); setScore(0); setWrong(0);
-    setShowHint(false); setAnimKey(k => k + 1);
+    setPnpScores([0, 0]); setCurrentTurn(0);
+    setAnimKey(k => k + 1);
+    resetTimer();
     setPhase("quiz");
-  }, [langId, level, lang, lvl.lives]);
-
-  // Start timer when phase becomes "quiz"
-  useEffect(() => {
-    if (phase === "quiz") startTimer();
-    return () => clearTimer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [normalizedLangId, level, lang, lvl.lives, resetTimer]);
 
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
   const q        = questions[current];
   const progress = questions.length ? (current / TOTAL_Q) * 100 : 0;
+  const answered = selected !== null || timedOut;
   const isCorrect = selected !== null && selected === q?.answer;
 
-  // Timer colour
-  const timerPct  = timeLeft / lvl.timePerQ;
-  const timerColor = timerPct > 0.5 ? "#22c55e" : timerPct > 0.25 ? "#f59e0b" : "#ef4444";
-
+  // ── Answer handler ────────────────────────────────────────────────────────
   const handleAnswer = (choice) => {
-    if (selected !== null || !q) return;
+    if (answered || !q) return;
     clearTimer();
     setSelected(choice);
     setShowExp(true);
     setShowHint(false);
 
-    if (choice === q.answer) {
+    const correct = choice === q.answer;
+    if (correct) {
       setScore(s => s + 1);
-    } else {
-      const newLives = lives - 1;
-      setWrong(w => w + 1);
-      setLives(newLives);
-      if (newLives === 0) {
-        setTimeout(() => setPhase("gameover"), 1600);
-        return;
+      if (passAndPlay) {
+        setPnpScores(s => { const ns = [...s]; ns[currentTurn] += 1; return ns; });
       }
+    } else {
+      setWrong(w => w + 1);
+      setLives(l => {
+        const next = l - 1;
+        if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
+        return Math.max(next, 0);
+      });
     }
   };
 
+  // ── Next handler ──────────────────────────────────────────────────────────
+  // FIX: setTimedOut(false) was missing — without it, a single timeout
+  // permanently blocks all subsequent questions from being answerable.
   const handleNext = () => {
     const next = current + 1;
     if (next >= TOTAL_Q) { setPhase("result"); return; }
+
+    if (passAndPlay) {
+      const nxt = 1 - currentTurn;
+      setNextTurnIdx(nxt);
+      setShowHandoff(true);
+      return;
+    }
+
     setCurrent(next);
     setSelected(null);
     setShowExp(false);
     setShowHint(false);
+    setTimedOut(false);   // ← critical fix
     setAnimKey(k => k + 1);
-    startTimer();
+    resetTimer();
+  };
+
+  const continueAfterHandoff = () => {
+    setCurrentTurn(nextTurnIdx);
+    setCurrent(c => c + 1);
+    setSelected(null);
+    setShowExp(false);
+    setShowHint(false);
+    setTimedOut(false);   // ← also reset here for Pass & Play path
+    setShowHandoff(false);
+    setAnimKey(k => k + 1);
+    resetTimer();
   };
 
   const restart = () => loadQuestions();
 
-  // ── Render code with blank ──
+  // ── Render code with blank ────────────────────────────────────────────────
   const renderCode = (code, blank, answer, sel) => {
     if (!code) return null;
-    const parts  = code.split(blank);
-    const filled = sel !== null && sel !== "__TIMEOUT__" ? sel : (sel === "__TIMEOUT__" ? "⏰" : blank);
-    const isTO   = sel === "__TIMEOUT__";
-    const color  = sel === null ? lvl.color : isTO ? "#ef4444" : sel === answer ? "#16a34a" : "#dc2626";
-    const bg     = sel === null ? lvl.color + "22" : isTO ? "#fee2e2" : sel === answer ? "#dcfce7" : "#fee2e2";
-
+    const parts   = code.split(blank);
+    const isTO    = sel === "__TIMEOUT__";
+    const filled  = sel !== null && !isTO ? sel : blank;
+    const color   = sel === null ? lvl.color : isTO ? "#DC2626" : sel === answer ? "#16A34A" : "#DC2626";
+    const bg      = sel === null ? lvl.color + "22" : isTO ? "#FEE2E2" : sel === answer ? "#DCFCE7" : "#FEE2E2";
     return parts.map((part, i) => (
       <span key={i}>
         <span style={{ whiteSpace: "pre" }}>{part}</span>
@@ -469,264 +594,311 @@ const GuessSyntax = () => {
     ));
   };
 
-  // ── Shared end page ──
-  const EndPage = ({ children }) => (
-    <div style={{ minHeight: "100vh", background: "#f5f0eb", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
-      <div style={{ background: "#fff", border: "1px solid #e8e2da", borderRadius: "20px", padding: "40px 28px", textAlign: "center", width: "100%", maxWidth: "420px" }}>
-        {children}
-      </div>
-    </div>
-  );
-  const ScoreCircle = ({ color }) => (
-    <div style={{ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: "#fafaf8" }}>
-      <span style={{ fontSize: "32px", fontWeight: "800", color, lineHeight: 1 }}>{score}</span>
-      <span style={{ fontSize: "12px", color: "#a09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
-    </div>
-  );
-  const BtnGroup   = ({ children }) => <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>{children}</div>;
-  const PrimaryBtn = ({ color, onClick, children }) => (
-    <button onClick={onClick} style={{ background: color, color: "#fff", border: "none", borderRadius: "12px", padding: "13px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" }}>{children}</button>
-  );
-  const SecondaryBtn = ({ onClick, children }) => (
-    <button onClick={onClick} style={{ background: "#f5f0eb", color: "#4a4540", border: "1.5px solid #ddd7ce", borderRadius: "12px", padding: "13px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" }}>{children}</button>
-  );
+  // ── Style helpers ─────────────────────────────────────────────────────────
+  const endPageWrap  = { minHeight: "100vh", background: "#F5F0EB", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" };
+  const endCardStyle = { background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "20px", padding: "40px 28px", textAlign: "center", width: "100%", maxWidth: "420px" };
+  const scoreCircle  = (c) => ({ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${c}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: "#FAFAF8" });
+  const btnPrimary   = (c) => ({ background: c, color: "#FFF", border: "none", borderRadius: "12px", padding: "13px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" });
+  const btnSecondary = { background: "#F5F0EB", color: "#4A4540", border: "1.5px solid #DDD7CE", borderRadius: "12px", padding: "13px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", flex: "1 1 auto", minWidth: "120px" };
+  const btnGroup     = { display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" };
 
+  // ── LOADING ───────────────────────────────────────────────────────────────
   if (phase === "loading") return (
-    <div style={{ minHeight: "100vh", background: "#f5f0eb", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F5F0EB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ width: "44px", height: "44px", borderRadius: "50%", border: "4px solid #ede8e1", borderTopColor: lvl.color, animation: "spin 0.85s linear infinite", marginBottom: "16px" }} />
+      <div style={{ width: "44px", height: "44px", borderRadius: "50%", border: "4px solid #EDE8E1", borderTopColor: lvl.color, animation: "spin 0.85s linear infinite", marginBottom: "16px" }} />
       <p style={{ color: lvl.color, fontWeight: "700", fontSize: "15px" }}>Loading {lvl.label} questions…</p>
     </div>
   );
 
-  if (phase === "gameover") return (
-    <EndPage>
-      <div style={{ fontSize: "52px", marginBottom: "16px" }}>💔</div>
-      <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#dc2626", marginBottom: "8px" }}>Out of Lives!</h2>
-      <ScoreCircle color="#dc2626" />
-      <p style={{ fontSize: "14px", color: "#7a7268", lineHeight: 1.6, marginBottom: "24px" }}>
-        You scored <strong>{score}/{TOTAL_Q}</strong>. You need at least {PASS_SCORE} to pass.
-      </p>
-      <BtnGroup>
-        <PrimaryBtn color={lvl.color} onClick={restart}>↺ Restart</PrimaryBtn>
-        <SecondaryBtn onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</SecondaryBtn>
-      </BtnGroup>
-    </EndPage>
+  // ── HANDOFF SCREEN (Pass & Play) ──────────────────────────────────────────
+  if (showHandoff) return (
+    <div style={{ minHeight: "100vh", background: playerColors[nextTurnIdx] === "#7C3AED" ? "#2D1B69" : "#0C3D52", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ textAlign: "center", color: "#FFF" }}>
+        <span style={{ fontSize: "56px", display: "block", marginBottom: "16px" }}>
+          {nextTurnIdx === 0 ? "🟣" : "🔵"}
+        </span>
+        <h2 style={{ fontSize: "28px", fontWeight: "800", margin: "0 0 8px" }}>
+          {playerNames[nextTurnIdx]}'s Turn
+        </h2>
+        <p style={{ fontSize: "15px", opacity: 0.75, margin: "0 0 12px" }}>
+          Question {current + 2} of {TOTAL_Q}
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "32px", marginBottom: "32px" }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "28px", fontWeight: "800" }}>{pnpScores[i]}</div>
+              <div style={{ fontSize: "13px", opacity: 0.7 }}>{playerNames[i]}</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: "14px", opacity: 0.65, margin: "0 0 28px", maxWidth: "280px" }}>
+          Hand the device to <strong>{playerNames[nextTurnIdx]}</strong> and tap Ready!
+        </p>
+        <button onClick={continueAfterHandoff}
+          style={{ background: "#FFF", color: playerColors[nextTurnIdx], border: "none", borderRadius: "14px", padding: "14px 36px", fontSize: "16px", fontWeight: "800", cursor: "pointer" }}>
+          I'm Ready! →
+        </button>
+      </div>
+    </div>
   );
 
+  // ── GAME OVER ─────────────────────────────────────────────────────────────
+  if (phase === "gameover") return (
+    <div style={endPageWrap}>
+      <div style={endCardStyle}>
+        <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>💔</span>
+        <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#DC2626", marginBottom: "8px" }}>Out of Lives!</h2>
+        <div style={scoreCircle("#DC2626")}>
+          <span style={{ fontSize: "32px", fontWeight: "800", color: "#DC2626", lineHeight: 1 }}>{score}</span>
+          <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
+        </div>
+        <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "20px" }}>
+          You need at least {PASS_SCORE} correct answers to pass.
+        </p>
+        <div style={btnGroup}>
+          <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Restart</button>
+          <button style={btnSecondary} onClick={() => navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${langId}`)}>← Back</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── RESULT ────────────────────────────────────────────────────────────────
   if (phase === "result") {
+    if (passAndPlay) {
+      const tied   = pnpScores[0] === pnpScores[1];
+      const winner = tied ? -1 : pnpScores[0] > pnpScores[1] ? 0 : 1;
+      return (
+        <div style={endPageWrap}>
+          <div style={endCardStyle}>
+            <span style={{ fontSize: "52px", display: "block", marginBottom: "16px" }}>{tied ? "🤝" : "🏆"}</span>
+            <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#1C1814", margin: "0 0 8px" }}>
+              {tied ? "It's a Tie!" : `${playerNames[winner]} Wins!`}
+            </h2>
+            <p style={{ fontSize: "14px", color: "#7A7268", marginBottom: "24px" }}>
+              {tied ? "Both players scored equally — great match!" : `${playerNames[winner]} answered more correctly!`}
+            </p>
+            <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
+              {[0, 1].map(i => (
+                <div key={i} style={{ flex: 1, background: winner === i ? "#F3F0FF" : "#FAFAF8", border: `2px solid ${winner === i ? playerColors[i] : "#E8E2DA"}`, borderRadius: "14px", padding: "16px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: playerColors[i], textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+                    {winner === i ? "🥇 " : ""}{playerNames[i]}
+                  </div>
+                  <div style={{ fontSize: "36px", fontWeight: "800", color: playerColors[i], lineHeight: 1 }}>{pnpScores[i]}</div>
+                  <div style={{ fontSize: "12px", color: "#9C9489", marginTop: "4px" }}>/ {TOTAL_Q}</div>
+                </div>
+              ))}
+            </div>
+            <div style={btnGroup}>
+              <button style={btnPrimary("#7C3AED")} onClick={restart}>↺ Play Again</button>
+              <button style={btnSecondary} onClick={() => navigate("/pass-and-play")}>← Change Game</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const passed    = score >= PASS_SCORE;
-    const color     = passed ? lvl.color : "#dc2626";
+    const rc        = passed ? lvl.color : "#DC2626";
     const nextLevel = level === "easy" ? "medium" : level === "medium" ? "hard" : null;
     return (
-      <EndPage>
-        <div style={{ fontSize: "52px", marginBottom: "16px" }}>{passed ? "🏆" : "😔"}</div>
-        <h2 style={{ fontSize: "24px", fontWeight: "800", color, marginBottom: "8px" }}>{passed ? "Level Complete!" : "Not Quite!"}</h2>
-        <ScoreCircle color={color} />
-        <p style={{ fontSize: "14px", color: "#7a7268", lineHeight: 1.6, marginBottom: "8px" }}>
-          {passed ? `Great job! You got ${score}/${TOTAL_Q} correct.` : `Need at least ${PASS_SCORE}/10 to pass.`}
-        </p>
-        <span style={{ fontSize: "13px", color: "#9c9489", display: "block", marginBottom: "24px" }}>
-          Lives left: {"❤️".repeat(lives)}{"🖤".repeat(Math.max(0, lvl.lives - lives))}
-        </span>
-        <BtnGroup>
-          {!passed && <PrimaryBtn color={lvl.color} onClick={restart}>↺ Try Again</PrimaryBtn>}
-          {passed && nextLevel && <PrimaryBtn color={lvl.color} onClick={() => navigate(`/games/${gameId}/play/${langId}/${nextLevel}`)}>Next Level →</PrimaryBtn>}
-          {passed && !nextLevel && <PrimaryBtn color="#7c3aed" onClick={() => navigate("/games")}>🎯 All Games</PrimaryBtn>}
-          <SecondaryBtn onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</SecondaryBtn>
-        </BtnGroup>
-      </EndPage>
+      <div style={endPageWrap}>
+        <div style={endCardStyle}>
+          <span style={{ fontSize: "52px", marginBottom: "16px", display: "block" }}>{passed ? "🏆" : "😔"}</span>
+          <h2 style={{ fontSize: "24px", fontWeight: "800", color: rc, marginBottom: "8px" }}>{passed ? "Level Complete!" : "Not Quite!"}</h2>
+          <div style={scoreCircle(rc)}>
+            <span style={{ fontSize: "32px", fontWeight: "800", color: rc, lineHeight: 1 }}>{score}</span>
+            <span style={{ fontSize: "12px", color: "#A09890", fontWeight: "600" }}>/ {TOTAL_Q}</span>
+          </div>
+          <p style={{ fontSize: "14px", color: "#7A7268", lineHeight: 1.6, marginBottom: "8px" }}>
+            {passed ? `Excellent! You got ${score} out of ${TOTAL_Q} correct.` : `You need ${PASS_SCORE}/10 to pass. Keep practicing!`}
+          </p>
+          <span style={{ fontSize: "13px", color: "#9C9489", marginBottom: "28px", display: "block" }}>
+            Lives remaining: {"❤️".repeat(lives)}{"🖤".repeat(Math.max(0, lvl.lives - lives))}
+          </span>
+          <div style={btnGroup}>
+            {!passed && <button style={btnPrimary(lvl.color)} onClick={restart}>↺ Try Again</button>}
+            {passed && nextLevel && <button style={btnPrimary(lvl.color)} onClick={() => navigate(`/games/${gameId}/play/${langId}/${nextLevel}`)}>Next Level →</button>}
+            {passed && !nextLevel && <button style={btnPrimary("#7C3AED")} onClick={() => navigate("/games")}>🎯 All Games</button>}
+            <button style={btnSecondary} onClick={() => navigate(`/games/${gameId}/level/${langId}`)}>← Change Level</button>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // ── QUIZ ──
+  // ── QUIZ ──────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        @keyframes spin    { to { transform: rotate(360deg); } }
-        @keyframes slideQ  { from { opacity:0;transform:translateX(20px); } to { opacity:1;transform:translateX(0); } }
-        @keyframes fadeExp { from { opacity:0;transform:translateY(6px);  } to { opacity:1;transform:translateY(0); } }
-        @keyframes pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-        .q-enter   { animation: slideQ  0.3s cubic-bezier(.22,.68,0,1.2) both; }
-        .exp-enter { animation: fadeExp 0.22s ease both; }
-        .opt-choice {
-          transition: transform 0.12s, border-color 0.12s, background 0.12s;
-          cursor: pointer; border: none; text-align: left; font-family: inherit;
+        @keyframes spin        { to { transform: rotate(360deg); } }
+        @keyframes slideQ      { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes fadeExp     { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes urgentPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.13)} }
+        @keyframes timedOutShake {
+          0%,100%{transform:translateX(0)}
+          20%{transform:translateX(-5px)} 40%{transform:translateX(5px)}
+          60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
         }
-        .opt-choice:hover:not(:disabled) { transform: translateX(4px); }
-        .opt-choice:disabled { cursor: default; }
-        .timer-urgent { animation: pulse 0.6s ease infinite; }
-        .next-btn:hover { opacity: 0.88; }
-        .next-btn:active { transform: scale(0.97); }
-        .exit-btn:hover { background: #ede8e1 !important; }
-        .hint-btn:hover { background: #ede8e1 !important; }
-
-        /* ── Responsive ── */
-        .quiz-root { min-height:100vh; background:#f5f0eb; font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; }
-        .quiz-content { flex:1; width:100%; max-width:700px; margin:0 auto; padding:18px 16px 48px; box-sizing:border-box; }
-        .choices-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-        .code-pre { font-size:14px; line-height:1.75; }
-        .score-band { display:grid; grid-template-columns:1fr 1fr 1fr; }
-
-        @media (max-width:540px) {
-          .choices-grid { grid-template-columns:1fr; }
-          .code-pre { font-size:12px; }
-          .quiz-content { padding:12px 10px 40px; }
-        }
-        @media (max-width:380px) {
-          .code-pre { font-size:11px; }
-          .score-band { grid-template-columns:1fr 1fr 1fr; }
+        .q-enter   { animation: slideQ  0.32s cubic-bezier(.22,.68,0,1.2) both; }
+        .exp-enter { animation: fadeExp 0.24s ease both; }
+        .timed-out-shake { animation: timedOutShake 0.45s ease both; }
+        .opt-hover:hover:not(:disabled) { transform: translateX(4px); border-color: #C4BADF !important; }
+        .next-hover:hover  { opacity: 0.88; }
+        .next-hover:active { transform: scale(0.97); }
+        .exit-hover:hover  { background: #EDE8E1 !important; }
+        .hint-hover:hover  { background: #EDE8E1 !important; }
+        @media(max-width:600px){
+          .choices-grid-resp { grid-template-columns: 1fr !important; }
+          .code-pre-resp     { font-size: 12px !important; }
+          .content-resp      { padding: 14px 12px 40px !important; }
+          .topbar-resp       { padding: 8px 12px !important; gap: 8px !important; }
+          .score-lbl-resp    { font-size: 9px !important; }
         }
       `}</style>
 
-      <div className="quiz-root">
+      <div style={{ minHeight: "100vh", background: "#F5F0EB", fontFamily: "'Segoe UI','Inter',system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
 
-        {/* ── TOP BAR ── */}
-        <div style={{ background: "#fff", borderBottom: "1px solid #e8e2da", padding: "10px 16px", display: "flex", alignItems: "center", gap: "10px", position: "sticky", top: 0, zIndex: 10 }}>
-          <button className="exit-btn" onClick={() => { clearTimer(); navigate(`/games/${gameId}/level/${langId}`); }}
-            style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #e0d8cf", background: "#f5f0eb", cursor: "pointer", fontSize: "14px", color: "#6b6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {/* TOP BAR */}
+        <div className="topbar-resp" style={{ background: "#FFF", borderBottom: "1px solid #E8E2DA", padding: "10px 20px", display: "flex", alignItems: "center", gap: "12px", position: "sticky", top: 0, zIndex: 10 }}>
+          <button className="exit-hover" onClick={() => { clearTimer(); navigate(passAndPlay ? "/pass-and-play" : `/games/${gameId}/level/${langId}`); }}
+            style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid #E0D8CF", background: "#F5F0EB", cursor: "pointer", fontSize: "15px", color: "#6B6560", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             ✕
           </button>
-
-          {/* Progress bar */}
-          <div style={{ flex: 1, height: "7px", background: "#ede8e1", borderRadius: "999px", overflow: "hidden" }}>
-            <div style={{ height: "100%", background: lvl.color, borderRadius: "999px", width: `${progress}%`, transition: "width 0.4s ease" }} />
+          <div style={{ flex: 1, height: "8px", background: "#EDE8E1", borderRadius: "999px", overflow: "hidden" }}>
+            <div style={{ height: "100%", background: passAndPlay ? playerColors[currentTurn] : lvl.color, borderRadius: "999px", width: `${progress}%`, transition: "width 0.45s ease" }} />
           </div>
-
-          {/* Timer pill */}
-          <div className={timeLeft <= 5 ? "timer-urgent" : ""} style={{
-            display: "flex", alignItems: "center", gap: "5px",
-            background: timerColor + "18", border: `1.5px solid ${timerColor}44`,
-            borderRadius: "999px", padding: "4px 10px", flexShrink: 0,
-          }}>
-            {/* Circular timer */}
-            <svg width="18" height="18" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
-              <circle cx="9" cy="9" r="7" fill="none" stroke="#ede8e1" strokeWidth="2.5" />
-              <circle cx="9" cy="9" r="7" fill="none" stroke={timerColor} strokeWidth="2.5"
-                strokeDasharray={`${2 * Math.PI * 7}`}
-                strokeDashoffset={`${2 * Math.PI * 7 * (1 - timerPct)}`}
-                strokeLinecap="round"
-                transform="rotate(-90 9 9)"
-                style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
-              />
-            </svg>
-            <span style={{ fontSize: "13px", fontWeight: "800", color: timerColor, fontVariantNumeric: "tabular-nums", minWidth: "18px" }}>
-              {timeLeft}s
-            </span>
-          </div>
-
-          {/* Lives */}
-          <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
+          <TimerRing timeLeft={timeLeft} timeLimit={lvl.timeLimit} color={passAndPlay ? playerColors[currentTurn] : lvl.color} />
+          <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
             {Array.from({ length: lvl.lives }).map((_, i) => (
-              <span key={i} style={{ fontSize: "16px", opacity: i < lives ? 1 : 0.22 }}>❤️</span>
+              <span key={i} style={{ fontSize: "18px", opacity: i < lives ? 1 : 0.22, lineHeight: 1 }}>❤️</span>
             ))}
           </div>
         </div>
 
-        {/* ── CONTENT ── */}
-        <div className="quiz-content">
+        {/* CONTENT */}
+        <div className="content-resp" style={{ flex: 1, width: "100%", maxWidth: "700px", margin: "0 auto", padding: "20px 16px 48px" }}>
 
           {/* Meta row */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-            <span style={{ fontSize: "13px", fontWeight: "600", color: "#8b7fb8" }}>📝 {lang} · {lvl.label}</span>
-            <span style={{ fontSize: "13px", color: "#9c9489", fontWeight: "600", background: "#ede8e1", padding: "3px 10px", borderRadius: "999px" }}>
-              {current + 1} / {TOTAL_Q}
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#8B7FB8" }}>
+              Guess Syntax • {lang} • {lvl.label}
+            </span>
+            <span style={{ fontSize: "13px", color: "#9C9489", fontWeight: "600", background: "#EDE8E1", padding: "4px 10px", borderRadius: "999px" }}>
+              {current + 1}/{TOTAL_Q}
             </span>
           </div>
 
+          {/* Pass & Play turn banner */}
+          {passAndPlay && (
+            <TurnBanner
+              currentTurn={currentTurn}
+              playerNames={playerNames}
+              scores={pnpScores}
+              colors={playerColors}
+            />
+          )}
+
           {/* Score band */}
-          <div className="score-band" style={{ background: "#fff", border: "1px solid #e8e2da", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", background: "#FFF", border: "1px solid #E8E2DA", borderRadius: "14px", overflow: "hidden", marginBottom: "18px" }}>
             {[
-              { num: score,      lbl: "Correct", color: "#16a34a" },
-              { num: wrong,      lbl: "Wrong",   color: "#dc2626" },
-              { num: PASS_SCORE, lbl: "To Pass", color: "#d97706" },
-            ].map((s, i) => (
-              <div key={s.lbl} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 6px", gap: "2px", borderRight: i < 2 ? "1px solid #ede8e1" : "none" }}>
+              { num: passAndPlay ? pnpScores[0] : score, lbl: passAndPlay ? playerNames[0].split(" ")[0] : "Correct", color: "#16A34A" },
+              { num: passAndPlay ? pnpScores[1] : wrong,  lbl: passAndPlay ? playerNames[1].split(" ")[0] : "Wrong",   color: passAndPlay ? "#0891b2" : "#DC2626" },
+              { num: PASS_SCORE,          lbl: "To Pass", color: "#D97706" },
+              { num: `${lvl.timeLimit}s`, lbl: "Per Q",   color: "#6366F1" },
+            ].map((s, i, arr) => (
+              <div key={s.lbl} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 6px", gap: "2px", borderRight: i < arr.length - 1 ? "1px solid #EDE8E1" : "none" }}>
                 <span style={{ fontSize: "18px", fontWeight: "700", lineHeight: 1, color: s.color }}>{s.num}</span>
-                <span style={{ fontSize: "10px", color: "#a09890", fontWeight: "600", letterSpacing: "0.5px", textTransform: "uppercase" }}>{s.lbl}</span>
+                <span className="score-lbl-resp" style={{ fontSize: "10px", color: "#A09890", fontWeight: "600", letterSpacing: "0.6px", textTransform: "uppercase" }}>{s.lbl}</span>
               </div>
             ))}
           </div>
 
-          {/* Question */}
+          {/* Question area */}
           <div key={animKey} className="q-enter">
 
-            {/* Instruction + hint row */}
+            {/* Timed-out banner */}
+            {timedOut && (
+              <div className="exp-enter timed-out-shake" style={{ background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: "12px", padding: "11px 16px", fontSize: "14px", color: "#92400E", marginBottom: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "20px" }}>⏰</span>
+                Time's up! Correct answer:&nbsp;
+                <span style={{ background: "#FDE68A", padding: "2px 8px", borderRadius: "6px", fontWeight: "800" }}>
+                  {q?.answer}
+                </span>
+              </div>
+            )}
+
+            {/* Instruction + hint toggle */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: "#a09890", textTransform: "uppercase" }}>Fill in the blank:</span>
-              {q?.hint && selected === null && (
-                <button className="hint-btn" onClick={() => setShowHint(h => !h)}
-                  style={{ background: showHint ? "#ede8e1" : "#f5f0eb", border: "1.5px solid #ddd7ce", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", color: "#6b6560", cursor: "pointer" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: "#A09890", textTransform: "uppercase" }}>Fill in the blank:</span>
+              {q?.hint && !answered && (
+                <button className="hint-hover" onClick={() => setShowHint(h => !h)}
+                  style={{ background: showHint ? "#EDE8E1" : "#F5F0EB", border: "1.5px solid #DDD7CE", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", color: "#6B6560", cursor: "pointer" }}>
                   {showHint ? "Hide Hint" : "💡 Hint"}
                 </button>
               )}
             </div>
 
-            {/* Hint bubble */}
+            {/* Hint box */}
             {showHint && q?.hint && (
-              <div className="exp-enter" style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#92400e", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="exp-enter" style={{ background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#92400E", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "16px" }}>💡</span>
                 <span>{q.hint}</span>
               </div>
             )}
 
-            {/* Timeout warning */}
-            {selected === "__TIMEOUT__" && (
-              <div className="exp-enter" style={{ background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#991b1b", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "16px" }}>⏰</span>
-                <span><strong>Time's up!</strong> The correct answer was: <code style={{ background: "#dcfce7", color: "#166534", padding: "1px 6px", borderRadius: "4px", fontFamily: "monospace" }}>{q?.answer}</code></span>
-              </div>
-            )}
-
             {/* Code block */}
-            <div style={{ background: "#1e1b2e", borderRadius: "14px", padding: "16px", marginBottom: "12px", overflow: "auto" }}>
+            <div style={{ background: "#1E1B2E", borderRadius: "14px", padding: "16px", marginBottom: "14px", overflow: "auto" }}>
               <div style={{ display: "flex", gap: "6px", marginBottom: "12px", alignItems: "center" }}>
-                {["#ff5f57","#febc2e","#28c840"].map((c,i) => <div key={i} style={{ width:"10px",height:"10px",borderRadius:"50%",background:c }} />)}
+                {["#FF5F57", "#FEBC2E", "#28C840"].map((c, i) => (
+                  <div key={i} style={{ width: "10px", height: "10px", borderRadius: "50%", background: c }} />
+                ))}
                 <span style={{ marginLeft: "auto", fontSize: "11px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
-                  {langId === "sql" ? "sql" : langId === "webdev" ? "js/html" : langId}
+                  {langId === "sql" ? "sql" : langId === "webdev" || langId === "web" ? "js/html" : langId}
                 </span>
               </div>
-              <pre className="code-pre" style={{ margin: 0, fontFamily: "'Fira Code','Cascadia Code','Consolas',monospace", color: "#e2e8f0", overflowX: "auto" }}>
-                <code>{renderCode(q?.code, q?.blank ?? "___", q?.answer, selected)}</code>
+              <pre className="code-pre-resp" style={{ margin: 0, fontSize: "14px", fontFamily: "'Fira Code','Cascadia Code','Consolas',monospace", color: "#E2E8F0", overflowX: "auto", lineHeight: 1.75 }}>
+                <code>{renderCode(q?.code, q?.blank ?? "___", q?.answer, answered ? (timedOut ? "__TIMEOUT__" : selected) : null)}</code>
               </pre>
             </div>
 
             {/* Choices */}
-            <div className="choices-grid" style={{ marginBottom: "12px" }}>
+            <div className="choices-grid-resp" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
               {q?.choices?.map((choice, i) => {
                 const isAns = choice === q.answer;
                 const isSel = choice === selected;
-                let bg = "#fff", border = "#e8e2da", txtClr = "#1c1814";
-                let letBg = "#f5f0eb", letClr = "#6b6560";
-                if (selected !== null) {
-                  if (isAns)      { bg = "#f0fdf4"; border = "#86efac"; txtClr = "#166534"; letBg = "#dcfce7"; letClr = "#15803d"; }
-                  else if (isSel) { bg = "#fef2f2"; border = "#fecaca"; txtClr = "#991b1b"; letBg = "#fee2e2"; letClr = "#b91c1c"; }
-                  else            { bg = "#fafaf8"; border = "#ede8e1"; txtClr = "#c0b8b0"; letClr = "#c0b8b0"; }
+                let bg = "#FFF", border = "#E8E2DA", txtClr = "#1C1814";
+                let letBg = "#F5F0EB", letClr = "#6B6560", letBorder = "#DDD7CE";
+                if (answered) {
+                  if (isAns)      { bg = "#F0FDF4"; border = "#86EFAC"; txtClr = "#166534"; letBg = "#DCFCE7"; letClr = "#15803D"; letBorder = "#86EFAC"; }
+                  else if (isSel) { bg = "#FEF2F2"; border = "#FECACA"; txtClr = "#991B1B"; letBg = "#FEE2E2"; letClr = "#B91C1C"; letBorder = "#FECACA"; }
+                  else            { bg = "#FAFAF8"; border = "#EDE8E1"; txtClr = "#C0B8B0"; letClr = "#C0B8B0"; }
                 }
                 return (
-                  <button key={i} className="opt-choice" disabled={selected !== null} onClick={() => handleAnswer(choice)}
-                    style={{ display: "flex", alignItems: "center", gap: "10px", padding: "11px 13px", background: bg, border: `1.5px solid ${border}`, borderRadius: "12px", width: "100%" }}>
-                    <span style={{ width: "26px", height: "26px", borderRadius: "50%", border: `1.5px solid ${border === "#e8e2da" ? "#ddd7ce" : border}`, background: letBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: letClr, flexShrink: 0, fontFamily: "monospace" }}>
-                      {["A","B","C","D"][i]}
+                  <button key={i} className="opt-hover" disabled={answered} onClick={() => handleAnswer(choice)}
+                    style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", background: bg, border: `1.5px solid ${border}`, borderRadius: "12px", cursor: answered ? "default" : "pointer", width: "100%", textAlign: "left", transition: "transform 0.15s, border-color 0.15s, background 0.15s" }}>
+                    <span style={{ width: "28px", height: "28px", borderRadius: "50%", border: `1.5px solid ${letBorder}`, background: letBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "700", color: letClr, flexShrink: 0, fontFamily: "monospace" }}>
+                      {LETTERS[i]}
                     </span>
-                    <span style={{ flex: 1, fontSize: "13px", fontWeight: "600", color: txtClr, fontFamily: "'Fira Code','Cascadia Code',monospace", lineHeight: 1.3, textAlign: "left" }}>
+                    <span style={{ flex: 1, fontSize: "13px", fontWeight: "600", color: txtClr, fontFamily: "'Fira Code','Cascadia Code',monospace", lineHeight: 1.4 }}>
                       {choice}
                     </span>
-                    {selected !== null && isAns && <span style={{ fontSize: "15px" }}>✅</span>}
-                    {selected !== null && isSel && !isAns && <span style={{ fontSize: "15px" }}>❌</span>}
+                    {answered && isAns && <span style={{ fontSize: "16px", flexShrink: 0 }}>✅</span>}
+                    {answered && isSel && !isAns && <span style={{ fontSize: "16px", flexShrink: 0 }}>❌</span>}
                   </button>
                 );
               })}
             </div>
 
             {/* Explanation */}
-            {showExp && q?.explanation && selected !== "__TIMEOUT__" && (
-              <div className="exp-enter" style={{ background: isCorrect ? "#f0fdf4" : "#fef2f2", border: `1.5px solid ${isCorrect ? "#86efac" : "#fecaca"}`, borderRadius: "12px", padding: "12px 14px", fontSize: "14px", color: isCorrect ? "#166534" : "#991b1b", lineHeight: 1.6, marginBottom: "12px" }}>
-                <span style={{ fontWeight: "700", display: "block", marginBottom: "4px", fontSize: "13px", color: isCorrect ? "#15803d" : "#b91c1c" }}>
+            {showExp && !timedOut && q?.explanation && (
+              <div className="exp-enter" style={{ background: isCorrect ? "#F0FDF4" : "#FEF2F2", border: `1.5px solid ${isCorrect ? "#86EFAC" : "#FECACA"}`, borderRadius: "12px", padding: "14px 16px", fontSize: "14px", color: isCorrect ? "#166534" : "#991B1B", lineHeight: 1.6, marginBottom: "14px" }}>
+                <span style={{ fontWeight: "700", display: "block", marginBottom: "4px", fontSize: "13px" }}>
                   {isCorrect ? "✅ Correct!" : "❌ Incorrect!"}
                   {!isCorrect && (
-                    <span style={{ color: "#15803d", marginLeft: "8px" }}>
-                      Answer: <code style={{ fontFamily: "monospace", background: "#dcfce7", padding: "1px 6px", borderRadius: "4px" }}>{q.answer}</code>
+                    <span style={{ color: "#15803D", marginLeft: "8px" }}>
+                      Answer: <code style={{ fontFamily: "monospace", background: "#DCFCE7", padding: "1px 6px", borderRadius: "4px" }}>{q.answer}</code>
                     </span>
                   )}
                 </span>
@@ -735,11 +907,11 @@ const GuessSyntax = () => {
             )}
 
             {/* Next button */}
-            {selected !== null && (
+            {answered && (
               <div className="exp-enter" style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button className="next-btn" onClick={handleNext}
-                  style={{ background: lvl.color, color: "#fff", border: "none", borderRadius: "12px", padding: "11px 22px", fontSize: "14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: `0 4px 14px ${lvl.color}55`, transition: "opacity 0.15s, transform 0.1s" }}>
-                  {current + 1 >= TOTAL_Q ? "See Result" : "Next"} →
+                <button className="next-hover" onClick={handleNext}
+                  style={{ background: passAndPlay ? playerColors[currentTurn] : lvl.color, color: "#FFF", border: "none", borderRadius: "12px", padding: "12px 24px", fontSize: "15px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: `0 4px 14px rgba(0,0,0,0.2)` }}>
+                  {current + 1 >= TOTAL_Q ? "See Result" : passAndPlay ? `Pass to ${playerNames[1 - currentTurn]} →` : "Next →"}
                 </button>
               </div>
             )}
