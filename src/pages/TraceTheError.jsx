@@ -1,4 +1,3 @@
-
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -202,7 +201,6 @@ const QUESTION_BANK = {
     ],
   },
 
-  // "web" maps to web dev
   web: {
     easy: [
       { code: `<html>\n<body>\n  <p>Hello World<p>\n</body>\n</html>`, error: "Paragraph tag not properly closed", options: ["Should be </p> to close paragraph, not <p>", "html tag is wrong", "body tag is wrong", "Hello World needs quotes"], answer: 0, explanation: "HTML tags must be closed properly. Use </p> to close the paragraph." },
@@ -283,7 +281,6 @@ const QUESTION_BANK = {
 };
 
 // Normalise URL param to question bank key
-// URL might be "web", "webdev", "Web Dev", etc.
 const normaliseLangKey = (langId) => {
   if (!langId) return null;
   const lower = langId.toLowerCase().replace(/[^a-z]/g, "");
@@ -317,6 +314,7 @@ function shuffle(arr) {
   return a;
 }
 
+// ── FIX 1: fetchFromAPI now shuffles options and fixes answer index ────────────
 async function fetchFromAPI(language, level) {
   const prompt = `Generate exactly 10 "trace the error" coding questions for ${language} at ${level} difficulty.
 Each question shows buggy code and asks what the error is.
@@ -336,7 +334,14 @@ Rules: answer is always index 0 in the options array. Make options realistic and
   const data = await res.json();
   const text = data.content.map(i => i.text || "").join("");
   const cleaned = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-  return JSON.parse(cleaned);
+  const parsed = JSON.parse(cleaned);
+
+  // Shuffle options so the correct answer isn't always option A
+  return parsed.map(q => {
+    const answerText = q.options[q.answer];
+    const shuffled   = shuffle([...q.options]);
+    return { ...q, options: shuffled, answer: shuffled.indexOf(answerText) };
+  });
 }
 
 // ── Timer Ring ────────────────────────────────────────────────────────────────
@@ -432,6 +437,8 @@ const TraceTheError = () => {
   const [questions, setQuestions] = useState([]);
   const [current,   setCurrent]   = useState(0);
   const [selected,  setSelected]  = useState(null);
+  // FIX 2: track lives in a ref alongside state so gameover timeout sees fresh value
+  const livesRef = useRef(lvl.lives);
   const [lives,     setLives]     = useState(lvl.lives);
   const [score,     setScore]     = useState(0);
   const [wrong,     setWrong]     = useState(0);
@@ -464,7 +471,8 @@ const TraceTheError = () => {
           setWrong(w => w + 1);
           setLives(l => {
             const next = l - 1;
-            if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
+            livesRef.current = next;
+            if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
             return next;
           });
           return 0;
@@ -485,30 +493,44 @@ const TraceTheError = () => {
 
     const bank = QUESTION_BANK[bankKey]?.[level];
 
-    const makeSet = (raw) =>
-      shuffle(raw && raw.length ? raw : []).slice(0, TOTAL_Q)
-        .map(q => {
-          const answerText = q.options[q.answer];
-          const shuffled   = shuffle([...q.options]);
-          return { ...q, options: shuffled, answer: shuffled.indexOf(answerText) };
-        });
+    // FIX 3: makeSet now handles both bank and API questions uniformly
+    const makeSet = (raw) => {
+      const source = raw && raw.length >= TOTAL_Q ? raw : (raw ?? []);
+      return shuffle(source).slice(0, TOTAL_Q).map(q => {
+        const answerText = q.options[q.answer];
+        const shuffled   = shuffle([...q.options]);
+        return { ...q, options: shuffled, answer: shuffled.indexOf(answerText) };
+      });
+    };
 
     let raw = bank && bank.length >= TOTAL_Q ? bank : null;
     if (!raw) {
       try {
-        raw = await fetchFromAPI(lang, level);
+        // API results are already shuffled inside fetchFromAPI, pass directly
+        const apiResults = await fetchFromAPI(lang, level);
+        // Reset state before setting questions
+        setCurrent(0); setSelected(null); setShowExp(false);
+        setLives(lvl.lives); livesRef.current = lvl.lives;
+        setScore(0); setWrong(0);
+        setPnpScores([0, 0]); setCurrentTurn(0);
+        setAnimKey(k => k + 1);
+        resetTimer();
+        setQuestions(apiResults.slice(0, TOTAL_Q));
+        setPhase("quiz");
+        return;
       } catch (e) {
         console.error("API fetch failed, using bank fallback:", e);
         raw = bank ?? [];
       }
     }
 
-    setQuestions(makeSet(raw));
     setCurrent(0); setSelected(null); setShowExp(false);
-    setLives(lvl.lives); setScore(0); setWrong(0);
+    setLives(lvl.lives); livesRef.current = lvl.lives;
+    setScore(0); setWrong(0);
     setPnpScores([0, 0]); setCurrentTurn(0);
     setAnimKey(k => k + 1);
     resetTimer();
+    setQuestions(makeSet(raw));
     setPhase("quiz");
   }, [bankKey, level, lang, lvl.lives, resetTimer]);
 
@@ -536,7 +558,8 @@ const TraceTheError = () => {
       setWrong(w => w + 1);
       setLives(l => {
         const next = l - 1;
-        if (next === 0) setTimeout(() => setPhase("gameover"), 1600);
+        livesRef.current = next;
+        if (next <= 0) setTimeout(() => setPhase("gameover"), 1600);
         return next;
       });
     }
@@ -724,7 +747,6 @@ const TraceTheError = () => {
         .exp-enter { animation: fadeExp 0.24s ease both; }
         .timed-out-shake { animation: timedOutShake 0.45s ease both; }
 
-        /* Responsive layout */
         .tte-container {
           flex: 1;
           width: 100%;

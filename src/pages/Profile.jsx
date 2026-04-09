@@ -1,14 +1,8 @@
-// import { useEffect, useState } from "react";
-// import { useAuth } from "../context/AuthContext";
-// import { signOut } from "firebase/auth";
-// import { auth, db } from "../firebase/FireBaseConfig";
-// import { doc, onSnapshot } from "firebase/firestore";
-// import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase/FireBaseConfig";
-import { doc, onSnapshot} from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
@@ -16,8 +10,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ games: 0, score: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Live Firestore listener — updates instantly when stats change
   useEffect(() => {
     if (!user) return;
     const ref = doc(db, "users", user.uid);
@@ -46,6 +40,66 @@ const Profile = () => {
         .nav-link-btn:hover { color: #7B2FBE !important; }
         .signout-top:hover { background: #fee2e2 !important; color: #dc2626 !important; }
         .stat-card:hover { transform: translateY(-4px); transition: transform 0.2s; }
+
+        .hamburger {
+          display: none;
+          flex-direction: column;
+          gap: 5px;
+          cursor: pointer;
+          background: none;
+          border: none;
+          padding: 4px;
+        }
+        .hamburger span {
+          display: block;
+          width: 22px;
+          height: 2px;
+          background: #555;
+          border-radius: 2px;
+          transition: 0.2s;
+        }
+        .mobile-menu {
+          display: none;
+          flex-direction: column;
+          background: #ffffff;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 12px 24px 16px;
+          gap: 4px;
+        }
+        .mobile-menu.open { display: flex; }
+        .mobile-nav-link {
+          font-size: 15px;
+          color: #555;
+          font-weight: 500;
+          padding: 10px 0;
+          border-bottom: 1px solid #f3f4f6;
+          cursor: pointer;
+          background: none;
+          border-left: none;
+          border-right: none;
+          border-top: none;
+          text-align: left;
+        }
+        .mobile-nav-link:hover { color: #7B2FBE; }
+        .mobile-signout-btn {
+          margin-top: 8px;
+          background: #f5f5f5;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          color: #555;
+          text-align: center;
+        }
+        .mobile-signout-btn:hover { background: #fee2e2; color: #dc2626; }
+
+        @media (max-width: 640px) {
+          .desktop-nav-links { display: none !important; }
+          .desktop-signout   { display: none !important; }
+          .hamburger         { display: flex !important; }
+        }
       `}</style>
 
       <div style={styles.root}>
@@ -57,12 +111,10 @@ const Profile = () => {
             <span style={styles.navIcon}>🎮</span>
             <span style={styles.navBrand}>Code While Playing</span>
           </div>
-          <div style={styles.navLinks}>
-            <span
-              className="nav-link-btn"
-              style={styles.navLink}
-              onClick={() => navigate("/games")}
-            >
+
+          {/* Desktop links */}
+          <div className="desktop-nav-links" style={styles.navLinks}>
+            <span className="nav-link-btn" style={styles.navLink} onClick={() => navigate("/games")}>
               Games
             </span>
             <span
@@ -72,12 +124,45 @@ const Profile = () => {
               Profile
             </span>
           </div>
-          <div style={styles.navRight}>
+
+          {/* Desktop sign-out */}
+          <div className="desktop-signout" style={styles.navRight}>
             <button className="signout-top" style={styles.signoutBtn} onClick={handleSignOut}>
               Sign Out
             </button>
           </div>
+
+          {/* Hamburger — mobile only */}
+          <button
+            className="hamburger"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Toggle menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </nav>
+
+        {/* Mobile dropdown menu */}
+        <div className={`mobile-menu${menuOpen ? " open" : ""}`}>
+          <button
+            className="mobile-nav-link"
+            onClick={() => { navigate("/games"); setMenuOpen(false); }}
+          >
+            Games
+          </button>
+          <button
+            className="mobile-nav-link"
+            style={{ color: "#7B2FBE", fontWeight: "700" }}
+            onClick={() => setMenuOpen(false)}
+          >
+            Profile
+          </button>
+          <button className="mobile-signout-btn" onClick={handleSignOut}>
+            Sign Out
+          </button>
+        </div>
 
         {/* PROFILE CONTENT */}
         <div style={styles.content}>
@@ -116,7 +201,7 @@ const Profile = () => {
             </div>
           )}
 
-          {/* Save Progress Card — only show if not logged in */}
+          {/* Save Progress / Keep Playing Card */}
           {!user ? (
             <div style={styles.saveCard}>
               <h2 style={styles.saveTitle}>Save Your Progress</h2>
